@@ -18,6 +18,10 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         bool IsActive, string? Password);
 
     public record PasswordInput(string Password);
+    public record PayItemInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory);
+    public record PayInput(
+        decimal? BasicSalary, decimal? MonthlyPcb, string? IcNumber, string? BankName, string? BankAccountNo,
+        string? EpfNo, string? SocsoNo, string? TaxNo, List<PayItemInput> Items);
     public record EntitlementInput(int LeaveTypeId, decimal? Days);
 
     public static string? PasswordProblem(string? password) =>
@@ -128,6 +132,54 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         audit.Log("UpdateEntitlements", nameof(User), id, year.ToString());
         await db.SaveChangesAsync();
         return NoContent();
+    }
+
+    [HttpGet("{id:int}/pay")]
+    [Authorize(Roles = Roles.AdminOrHR)]
+    public async Task<IActionResult> GetPay(int id)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+        var items = await db.EmployeePayItems.Where(i => i.UserId == id).OrderBy(i => i.Kind).ThenBy(i => i.Id)
+            .Select(i => new { i.Kind, i.Name, i.Amount, i.Statutory }).ToListAsync();
+        return Ok(new
+        {
+            user.BasicSalary, user.MonthlyPcb, user.IcNumber, user.BankName, user.BankAccountNo,
+            user.EpfNo, user.SocsoNo, user.TaxNo, Items = items,
+        });
+    }
+
+    [HttpPut("{id:int}/pay")]
+    [Authorize(Roles = Roles.AdminOrHR)]
+    public async Task<IActionResult> UpdatePay(int id, PayInput input)
+    {
+        var user = await db.Users.FindAsync(id);
+        if (user is null) return NotFound();
+        if (input.BasicSalary < 0 || input.MonthlyPcb < 0 || input.Items.Any(i => i.Amount < 0 || string.IsNullOrWhiteSpace(i.Name)))
+            return BadRequest(new { message = "Amounts cannot be negative, and every item needs a name." });
+
+        ApplyPay(user, input.BasicSalary, input.MonthlyPcb, input.IcNumber, input.BankName, input.BankAccountNo, input.EpfNo, input.SocsoNo, input.TaxNo);
+        db.EmployeePayItems.RemoveRange(db.EmployeePayItems.Where(i => i.UserId == id));
+        db.EmployeePayItems.AddRange(input.Items.Select(i => new EmployeePayItem
+        {
+            UserId = id, Kind = i.Kind, Name = i.Name.Trim(), Amount = Math.Round(i.Amount, 2), Statutory = i.Statutory,
+        }));
+        audit.Log("UpdatePay", nameof(User), id, user.Username);
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    internal static void ApplyPay(User user, decimal? basic, decimal? pcb, string? ic, string? bank, string? account, string? epf, string? socso, string? tax)
+    {
+        static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+        user.BasicSalary = basic is null ? null : Math.Round(basic.Value, 2);
+        user.MonthlyPcb = pcb is null ? null : Math.Round(pcb.Value, 2);
+        user.IcNumber = Clean(ic);
+        user.BankName = Clean(bank);
+        user.BankAccountNo = Clean(account);
+        user.EpfNo = Clean(epf);
+        user.SocsoNo = Clean(socso);
+        user.TaxNo = Clean(tax);
     }
 
     /// <summary>HR data is visible to the person themselves, HR/admin, and their direct manager.</summary>

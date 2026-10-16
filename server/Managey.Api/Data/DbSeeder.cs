@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Managey.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace Managey.Api.Data;
@@ -26,7 +27,7 @@ public static class DbSeeder
                 new LeaveType { Name = "Annual", DefaultDays = 14 },
                 new LeaveType { Name = "Medical", DefaultDays = 14, RequiresAttachment = true },
                 new LeaveType { Name = "Emergency", DefaultDays = 3 },
-                new LeaveType { Name = "Unpaid", DefaultDays = 30 });
+                new LeaveType { Name = "Unpaid", DefaultDays = 30, IsUnpaid = true });
         }
 
         if (!await db.WorkflowSteps.AnyAsync())
@@ -41,7 +42,11 @@ public static class DbSeeder
                 new WorkflowStep { RequestType = RequestType.General, StepOrder = 1, ApproverKind = ApproverKind.DirectManager });
         }
 
-        foreach (var (key, value) in new[] { ("CompanyName", "My Company"), ("WorkStartTime", "09:00"), ("WorkEndTime", "18:00") })
+        var defaults = new (string, string)[]
+        {
+            ("CompanyName", "My Company"), ("WorkStartTime", "09:00"), ("WorkEndTime", "18:00"),
+        }.Concat(PayrollSettings.Defaults.Select(d => (PayrollSettings.Prefix + d.Key, d.Value)));
+        foreach (var (key, value) in defaults)
         {
             if (!await db.Settings.AnyAsync(s => s.Key == key))
                 db.Settings.Add(new Setting { Key = key, Value = value });

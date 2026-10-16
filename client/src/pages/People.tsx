@@ -20,7 +20,10 @@ export default function People() {
       <PageHeader
         title="People"
         subtitle={data && `${data.filter(u => u.isActive).length} active employees`}
-        actions={isHR && <Link className="button primary" to="/people/new">Add employee</Link>}
+        actions={isHR && <>
+          <Link className="button" to="/people/import">Import from Excel</Link>
+          <Link className="button primary" to="/people/new">Add employee</Link>
+        </>}
       />
       <section>
         <div className="filters">

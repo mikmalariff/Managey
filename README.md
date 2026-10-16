@@ -7,7 +7,8 @@ HR and approvals software for small and medium businesses. It runs on your own W
 - **Attendance**: clock in and out, late marking, team and company reports, CSV export
 - **Leave**: leave types and yearly entitlement, per-person overrides, balances, half days, overlap and balance checks; weekends and public holidays are not counted
 - **Requests and approvals**: leave, claims, purchases and general requests, each with attachments and a configurable multi-step approval chain (direct manager, HR, admin or a specific person)
-- **People**: employee directory, departments, reporting lines, roles (Admin, HR, Manager, Staff)
+- **People**: employee directory, departments, reporting lines, roles (Admin, HR, Manager, Staff), bulk import and update from Excel or CSV
+- **Payroll**: monthly payroll with basic salary, fixed allowances and deductions, approved claims, unpaid leave, EPF, SOCSO, EIS and PCB; printable payslips for staff, Excel summary and bank file for HR
 - **Documents**: company library for policies, forms and handbooks
 - **Email notifications**: approvers are emailed when a request needs them, and requesters when it is decided (any SMTP server, e.g. Microsoft 365)
 - **Audit log**: every change is recorded with who did it and when
@@ -57,6 +58,16 @@ cd client && npm install && npm run dev
 3. **People → Add employee**: set *Reports to*, because that person approves the employee's requests first.
 4. **Setup → Approval flows**: adjust who approves each request type.
 5. **Setup → Email**: enter your mail server and send a test email.
+6. **Setup → Payroll**: check the EPF, SOCSO and EIS rates.
+
+To bring in existing staff, go to **People → Import from Excel**, download the template, fill it in and upload it. You see a preview first, and nothing is saved until every row is valid. New employees get a temporary password; download the list when the import finishes.
+
+## Payroll notes
+
+- Set each employee's basic salary, PCB and bank details under **People → (employee) → Pay details**. Only HR and admin can see these.
+- **Payroll → Run payroll** creates a draft payslip for every active employee with a basic salary. Approved claims are added as reimbursements, once only, and approved leave of an unpaid leave type is deducted at basic ÷ days per month.
+- EPF is worked out on the Third Schedule wage bands. SOCSO and EIS are worked out as a percentage of wages up to the ceiling. **These are estimates: check them against the official KWSP and PERKESO tables.** You can type exact amounts on any payslip. PCB is not calculated; enter the amount from the LHDN calculator.
+- **Finalise** locks the month and lets staff see their payslips under **Payslips**, where they can print them or save them as PDF.
 
 ## Changing the database model
 

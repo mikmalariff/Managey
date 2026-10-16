@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { api, type Department, type LeaveBalance, type Role, type UserRow } from '../api'
+import { api, type Department, type LeaveBalance, type PayDetails, type PayItem, type Role, type UserRow } from '../api'
 import { useMe } from '../auth'
 import { ErrorText, Field, Loading, PageHeader, useFetch } from '../components/ui'
 
@@ -124,6 +124,7 @@ export default function PersonEdit() {
         </div>
       </form>
 
+      {!isNew && <PayDetailsForm userId={Number(id)} />}
       {!isNew && <Entitlements userId={Number(id)} />}
     </div>
   )
@@ -179,6 +180,92 @@ function Entitlements({ userId }: { userId: number }) {
       <ErrorText error={error} />
       <div className="form-actions" style={{ marginTop: 12 }}>
         <button onClick={save}>Save entitlement</button>
+        {saved && <span className="muted" style={{ alignSelf: 'center' }}>Saved</span>}
+      </div>
+    </section>
+  )
+}
+
+type PayForm = Omit<PayDetails, 'basicSalary' | 'monthlyPcb' | 'items'> & { basicSalary: string; monthlyPcb: string; items: PayItem[] }
+
+function PayDetailsForm({ userId }: { userId: number }) {
+  const { data } = useFetch<PayDetails>(`/api/users/${userId}/pay`)
+  const [form, setForm] = useState<PayForm | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (data) setForm({ ...data, basicSalary: data.basicSalary?.toString() ?? '', monthlyPcb: data.monthlyPcb?.toString() ?? '' })
+  }, [data])
+  if (!form) return null
+
+  const set = (patch: Partial<PayForm>) => { setForm({ ...form, ...patch }); setSaved(false) }
+  const setItem = (i: number, patch: Partial<PayItem>) => set({ items: form.items.map((x, j) => (j === i ? { ...x, ...patch } : x)) })
+  const text = (key: 'icNumber' | 'bankName' | 'bankAccountNo' | 'epfNo' | 'socsoNo' | 'taxNo') => ({
+    value: form[key] ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => set({ [key]: e.target.value }),
+  })
+
+  const save = async () => {
+    setError(null)
+    try {
+      await api.put(`/api/users/${userId}/pay`, {
+        ...form,
+        basicSalary: form.basicSalary === '' ? null : Number(form.basicSalary),
+        monthlyPcb: form.monthlyPcb === '' ? null : Number(form.monthlyPcb),
+      })
+      setSaved(true)
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <section className="form">
+      <div>
+        <h2>Pay details</h2>
+        <p className="muted" style={{ marginTop: 4 }}>Visible to HR and admin only. Used to build monthly payslips.</p>
+      </div>
+      <div className="grid-2">
+        <Field label="Basic salary (RM / month)" hint="Leave blank to leave this person out of payroll">
+          <input type="number" min="0" step="0.01" value={form.basicSalary} onChange={e => set({ basicSalary: e.target.value })} />
+        </Field>
+        <Field label="PCB / MTD (RM / month)" hint="From the LHDN calculator or e-PCB">
+          <input type="number" min="0" step="0.01" value={form.monthlyPcb} onChange={e => set({ monthlyPcb: e.target.value })} />
+        </Field>
+        <Field label="IC number"><input {...text('icNumber')} /></Field>
+        <Field label="Income tax no."><input {...text('taxNo')} /></Field>
+        <Field label="EPF no."><input {...text('epfNo')} /></Field>
+        <Field label="SOCSO no."><input {...text('socsoNo')} /></Field>
+        <Field label="Bank"><input {...text('bankName')} placeholder="e.g. Maybank" /></Field>
+        <Field label="Account no."><input {...text('bankAccountNo')} /></Field>
+      </div>
+
+      <div className="stack" style={{ gap: 8 }}>
+        <div className="spread">
+          <h3>Fixed monthly allowances & deductions</h3>
+          <div className="row">
+            <button className="link" onClick={() => set({ items: [...form.items, { kind: 'Earning', name: '', amount: 0, statutory: true }] })}>Add allowance</button>
+            <button className="link" onClick={() => set({ items: [...form.items, { kind: 'Deduction', name: '', amount: 0, statutory: false }] })}>Add deduction</button>
+          </div>
+        </div>
+        {form.items.length === 0 && <p className="faint">None.</p>}
+        {form.items.map((item, i) => (
+          <div className="row" key={i} style={{ flexWrap: 'nowrap' }}>
+            <span className="muted" style={{ width: 80 }}>{item.kind === 'Earning' ? 'Allowance' : 'Deduction'}</span>
+            <input value={item.name} placeholder={item.kind === 'Earning' ? 'e.g. Transport allowance' : 'e.g. Staff loan'} onChange={e => setItem(i, { name: e.target.value })} />
+            <input type="number" min="0" step="0.01" value={item.amount} onChange={e => setItem(i, { amount: Number(e.target.value) })} style={{ width: 110 }} />
+            <label className="check muted nowrap" title="Counts as wages for EPF, SOCSO and EIS">
+              <input type="checkbox" checked={item.statutory} onChange={e => setItem(i, { statutory: e.target.checked })} /> EPF
+            </label>
+            <button className="ghost icon" aria-label="Remove" onClick={() => set({ items: form.items.filter((_, j) => j !== i) })}>×</button>
+          </div>
+        ))}
+      </div>
+
+      <ErrorText error={error} />
+      <div className="form-actions">
+        <button onClick={save}>Save pay details</button>
         {saved && <span className="muted" style={{ alignSelf: 'center' }}>Saved</span>}
       </div>
     </section>

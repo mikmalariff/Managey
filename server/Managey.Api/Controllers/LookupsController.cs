@@ -67,7 +67,7 @@ public class DepartmentsController(AppDbContext db, AuditService audit) : Contro
 [Authorize]
 public class LeaveTypesController(AppDbContext db, AuditService audit) : ControllerBase
 {
-    public record LeaveTypeInput(string Name, decimal DefaultDays, bool RequiresAttachment, bool IsActive);
+    public record LeaveTypeInput(string Name, decimal DefaultDays, bool RequiresAttachment, bool IsUnpaid, bool IsActive);
 
     [HttpGet]
     public async Task<IActionResult> List() => Ok(await db.LeaveTypes.OrderBy(t => t.Name).ToListAsync());
@@ -111,6 +111,7 @@ public class LeaveTypesController(AppDbContext db, AuditService audit) : Control
         type.Name = input.Name.Trim();
         type.DefaultDays = input.DefaultDays;
         type.RequiresAttachment = input.RequiresAttachment;
+        type.IsUnpaid = input.IsUnpaid;
         type.IsActive = input.IsActive;
     }
 }

@@ -42,6 +42,8 @@ builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<WorkflowService>();
 builder.Services.AddScoped<EmailSettings>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<PayrollSettings>();
+builder.Services.AddScoped<PayrollService>();
 builder.Services.AddSingleton<EmailQueue>();
 builder.Services.AddHostedService<EmailSender>();
 builder.Services.AddSingleton<FileStorage>();

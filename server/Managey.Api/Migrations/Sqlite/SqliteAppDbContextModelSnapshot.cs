@@ -187,6 +187,38 @@ namespace Managey.Api.Migrations.Sqlite
                     b.ToTable("Documents");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.EmployeePayItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Statutory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("EmployeePayItems");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Holiday", b =>
                 {
                     b.Property<int>("Id")
@@ -248,6 +280,9 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsUnpaid")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -261,6 +296,190 @@ namespace Managey.Api.Migrations.Sqlite
                         .IsUnique();
 
                     b.ToTable("LeaveTypes");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayrollRun", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CreatedById")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("FinalizedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("FinalizedById")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("PayrollRuns");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BankAccountNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BasicSalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Department")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EisEmployee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EisEmployer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployeeName")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployeeNo")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EpfEmployee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EpfEmployer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EpfNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("GrossPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IcNumber")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("NetPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PayrollRunId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Pcb")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Position")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SocsoEmployee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SocsoEmployer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SocsoNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("StatutoryOverride")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("StatutoryWage")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TaxNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("TotalDeductions")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("PayrollRunId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("Payslips");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PayslipId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("RequestId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Statutory")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayslipId");
+
+                    b.HasIndex("RequestId");
+
+                    b.ToTable("PayslipLines");
                 });
 
             modelBuilder.Entity("Managey.Api.Data.Request", b =>
@@ -350,6 +569,16 @@ namespace Managey.Api.Migrations.Sqlite
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("BankAccountNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("BasicSalary")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -363,8 +592,14 @@ namespace Managey.Api.Migrations.Sqlite
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("EpfNo")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("FullName")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("IcNumber")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
@@ -379,6 +614,10 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<int?>("ManagerId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal?>("MonthlyPcb")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -392,6 +631,12 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SocsoNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("TaxNo")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Username")
@@ -494,6 +739,26 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("UploadedBy");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
+                {
+                    b.HasOne("Managey.Api.Data.PayrollRun", "PayrollRun")
+                        .WithMany("Payslips")
+                        .HasForeignKey("PayrollRunId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PayrollRun");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
+                {
+                    b.HasOne("Managey.Api.Data.Payslip", null)
+                        .WithMany("Lines")
+                        .HasForeignKey("PayslipId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Request", b =>
                 {
                     b.HasOne("Managey.Api.Data.LeaveType", "LeaveType")
@@ -526,6 +791,16 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("Department");
 
                     b.Navigation("Manager");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayrollRun", b =>
+                {
+                    b.Navigation("Payslips");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
+                {
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("Managey.Api.Data.Request", b =>

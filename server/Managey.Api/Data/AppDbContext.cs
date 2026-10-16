@@ -20,6 +20,10 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<Holiday> Holidays => Set<Holiday>();
+    public DbSet<EmployeePayItem> EmployeePayItems => Set<EmployeePayItem>();
+    public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
+    public DbSet<Payslip> Payslips => Set<Payslip>();
+    public DbSet<PayslipLine> PayslipLines => Set<PayslipLine>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -79,6 +83,30 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<AuditLog>().HasIndex(x => x.Timestamp);
         b.Entity<Setting>().HasKey(x => x.Key);
         b.Entity<Holiday>().HasIndex(x => x.Date).IsUnique();
+
+        b.Entity<EmployeePayItem>(e =>
+        {
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.UserId);
+        });
+        b.Entity<PayrollRun>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => new { x.Year, x.Month }).IsUnique();
+            e.HasMany(x => x.Payslips).WithOne(x => x.PayrollRun!).HasForeignKey(x => x.PayrollRunId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<Payslip>(e =>
+        {
+            e.HasIndex(x => new { x.PayrollRunId, x.UserId }).IsUnique();
+            e.HasIndex(x => x.UserId);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<PayslipLine>(e =>
+        {
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+            e.HasIndex(x => x.RequestId);
+        });
     }
 }
 

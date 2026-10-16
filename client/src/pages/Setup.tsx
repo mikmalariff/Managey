@@ -4,7 +4,7 @@ import { useMe } from '../auth'
 import { ErrorText, Field, Loading, Modal, PageHeader, Status, Tabs, useFetch } from '../components/ui'
 import { approverLabel, fmt } from '../format'
 
-type Section = 'departments' | 'leave' | 'holidays' | 'workflows' | 'email' | 'company'
+type Section = 'departments' | 'leave' | 'holidays' | 'payroll' | 'workflows' | 'email' | 'company'
 
 export default function Setup() {
   const { isAdmin } = useMe()
@@ -13,6 +13,7 @@ export default function Setup() {
     { value: 'departments', label: 'Departments' },
     { value: 'leave', label: 'Leave types' },
     { value: 'holidays', label: 'Public holidays' },
+    { value: 'payroll', label: 'Payroll' },
     ...(isAdmin ? [
       { value: 'workflows' as Section, label: 'Approval flows' },
       { value: 'email' as Section, label: 'Email' },
@@ -28,6 +29,7 @@ export default function Setup() {
         {section === 'departments' && <Departments />}
         {section === 'leave' && <LeaveTypes />}
         {section === 'holidays' && <Holidays />}
+        {section === 'payroll' && <PayrollRates />}
         {section === 'workflows' && <Workflows />}
         {section === 'email' && <EmailSettings />}
         {section === 'company' && <Company />}
@@ -97,18 +99,19 @@ function LeaveTypes() {
     <div className="stack" style={{ maxWidth: 720 }}>
       <div className="spread">
         <p className="muted">Default days apply to everyone each year. Override per person on their profile.</p>
-        <button className="primary" onClick={() => setEditing({ name: '', defaultDays: 0, requiresAttachment: false, isActive: true })}>Add leave type</button>
+        <button className="primary" onClick={() => setEditing({ name: '', defaultDays: 0, requiresAttachment: false, isUnpaid: false, isActive: true })}>Add leave type</button>
       </div>
       {!data ? <Loading /> : (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Leave type</th><th className="right">Days / year</th><th>Document</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Leave type</th><th className="right">Days / year</th><th>Document</th><th>Pay</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {data.map(t => (
                 <tr key={t.id}>
                   <td>{t.name}</td>
                   <td className="right mono">{t.defaultDays}</td>
                   <td className="muted">{t.requiresAttachment ? 'Required' : 'Optional'}</td>
+                  <td className="muted">{t.isUnpaid ? 'Unpaid' : 'Paid'}</td>
                   <td><Status value={t.isActive ? 'Active' : 'Inactive'} /></td>
                   <td className="right"><button className="link" onClick={() => setEditing(t)}>Edit</button></td>
                 </tr>
@@ -146,6 +149,10 @@ function LeaveTypeModal({ value, onClose, onDone }: { value: Partial<LeaveType>;
         <label className="check">
           <input type="checkbox" checked={form.requiresAttachment} onChange={e => setForm({ ...form, requiresAttachment: e.target.checked })} />
           Supporting document required (e.g. medical certificate)
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={form.isUnpaid} onChange={e => setForm({ ...form, isUnpaid: e.target.checked })} />
+          Unpaid: deduct these days from salary in payroll
         </label>
         <label className="check">
           <input type="checkbox" checked={form.isActive} onChange={e => setForm({ ...form, isActive: e.target.checked })} />
@@ -420,6 +427,61 @@ function EmailSettings() {
       </div>
       <ErrorText error={error} />
       {status && <p className="muted">{status}</p>}
+    </div>
+  )
+}
+
+const rateFields: { key: string; label: string; hint?: string }[] = [
+  { key: 'EpfEmployee', label: 'EPF employee (%)' },
+  { key: 'EpfEmployerLow', label: 'EPF employer, wages up to threshold (%)' },
+  { key: 'EpfEmployerHigh', label: 'EPF employer, wages above threshold (%)' },
+  { key: 'EpfEmployerThreshold', label: 'EPF employer threshold (RM)' },
+  { key: 'SocsoEmployee', label: 'SOCSO employee (%)' },
+  { key: 'SocsoEmployer', label: 'SOCSO employer (%)' },
+  { key: 'EisEmployee', label: 'EIS employee (%)' },
+  { key: 'EisEmployer', label: 'EIS employer (%)' },
+  { key: 'SocsoEisCeiling', label: 'SOCSO & EIS wage ceiling (RM)' },
+  { key: 'DaysPerMonth', label: 'Days per month', hint: 'Used to work out the daily rate for unpaid leave' },
+]
+
+function PayrollRates() {
+  const { data } = useFetch<Record<string, number>>('/api/payroll/settings')
+  const [form, setForm] = useState<Record<string, string>>({})
+  const [status, setStatus] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { if (data) setForm(Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)]))) }, [data])
+  if (!data) return <Loading />
+
+  const save = async () => {
+    setError(null)
+    setStatus(null)
+    try {
+      await api.put('/api/payroll/settings', Object.fromEntries(Object.entries(form).map(([k, v]) => [k, Number(v)])))
+      setStatus('Saved. New rates apply to payslips you create or rebuild from now on.')
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  return (
+    <div className="form">
+      <p className="muted">
+        Statutory contribution rates. The defaults follow the usual rates for Malaysian citizens under 60. Update them when the
+        rules change, and check results against the official KWSP, PERKESO and LHDN tables. PCB is set per employee.
+      </p>
+      <div className="grid-2">
+        {rateFields.map(f => (
+          <Field key={f.key} label={f.label} hint={f.hint}>
+            <input type="number" min="0" step="0.01" value={form[f.key] ?? ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} />
+          </Field>
+        ))}
+      </div>
+      <ErrorText error={error} />
+      <div className="form-actions">
+        <button className="primary" onClick={save}>Save</button>
+        {status && <span className="muted" style={{ alignSelf: 'center' }}>{status}</span>}
+      </div>
     </div>
   )
 }

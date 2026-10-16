@@ -36,7 +36,7 @@ export interface UserRow {
 
 export interface Department { id: number; name: string; headcount: number }
 
-export interface LeaveType { id: number; name: string; defaultDays: number; requiresAttachment: boolean; isActive: boolean }
+export interface LeaveType { id: number; name: string; defaultDays: number; requiresAttachment: boolean; isUnpaid: boolean; isActive: boolean }
 
 export interface Holiday { id: number; date: string; name: string }
 
@@ -172,4 +172,68 @@ export const api = {
   post: <T = void>(url: string, body?: unknown) => request<T>('POST', url, body ?? {}),
   put: <T = void>(url: string, body?: unknown) => request<T>('PUT', url, body ?? {}),
   del: <T = void>(url: string) => request<T>('DELETE', url),
+}
+
+export type PayItemKind = 'Earning' | 'Deduction'
+export type PayLineSource = 'Manual' | 'Recurring' | 'Claim' | 'UnpaidLeave'
+
+export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean }
+
+export interface PayDetails {
+  basicSalary: number | null
+  monthlyPcb: number | null
+  icNumber: string | null
+  bankName: string | null
+  bankAccountNo: string | null
+  epfNo: string | null
+  socsoNo: string | null
+  taxNo: string | null
+  items: PayItem[]
+}
+
+export interface PayrollRunRow {
+  id: number
+  year: number
+  month: number
+  status: 'Draft' | 'Finalized'
+  createdAt: string
+  finalizedAt: string | null
+  employees: number
+  netPay: number
+}
+
+export interface PayslipLine extends PayItem { source: PayLineSource; requestId: number | null }
+
+export interface PayslipDetail {
+  id: number
+  payrollRunId: number
+  year: number
+  month: number
+  runStatus: 'Draft' | 'Finalized'
+  companyName: string | null
+  userId: number
+  employeeNo: string
+  employeeName: string
+  department: string | null
+  position: string | null
+  icNumber: string | null
+  epfNo: string | null
+  socsoNo: string | null
+  taxNo: string | null
+  bankName: string | null
+  bankAccountNo: string | null
+  basicSalary: number
+  grossPay: number
+  statutoryWage: number
+  statutoryOverride: boolean
+  epfEmployee: number
+  epfEmployer: number
+  socsoEmployee: number
+  socsoEmployer: number
+  eisEmployee: number
+  eisEmployer: number
+  pcb: number
+  totalDeductions: number
+  netPay: number
+  lines: PayslipLine[]
 }
