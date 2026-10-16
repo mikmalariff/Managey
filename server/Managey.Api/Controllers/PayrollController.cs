@@ -16,12 +16,12 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
 {
     public record RunInput(int Year, int Month);
 
-    public record LineInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory, PayLineSource Source, int? RequestId);
+    public record LineInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory, PayCategory Category, PayLineSource Source, int? RequestId);
 
     public record PayslipInput(
         decimal BasicSalary, List<LineInput> Lines, bool StatutoryOverride,
         decimal EpfEmployee, decimal EpfEmployer, decimal SocsoEmployee, decimal SocsoEmployer,
-        decimal EisEmployee, decimal EisEmployer, decimal Pcb);
+        decimal EisEmployee, decimal EisEmployer, decimal SkbbkEmployee, decimal Pcb);
 
     [HttpGet("runs")]
     public async Task<IActionResult> Runs()
@@ -62,15 +62,17 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
             Payslips = slips.Select(p => new
             {
                 p.Id, p.UserId, p.EmployeeNo, p.EmployeeName, p.Department, p.GrossPay, p.TotalDeductions, p.NetPay,
-                p.EpfEmployee, p.EpfEmployer, p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.Pcb,
+                p.EpfEmployee, p.EpfEmployer, p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.SkbbkEmployee, p.Pcb,
                 MissingBank = string.IsNullOrEmpty(p.BankAccountNo),
+                MissingIc = string.IsNullOrEmpty(p.IcNumber) && string.IsNullOrEmpty(p.PassportNo) && string.IsNullOrEmpty(p.SocsoNo),
+                MissingEpfNo = string.IsNullOrEmpty(p.EpfNo) && p.EpfEmployee + p.EpfEmployer > 0,
             }),
             Totals = new
             {
                 GrossPay = slips.Sum(p => p.GrossPay),
                 NetPay = slips.Sum(p => p.NetPay),
                 Epf = slips.Sum(p => p.EpfEmployee + p.EpfEmployer),
-                Socso = slips.Sum(p => p.SocsoEmployee + p.SocsoEmployer),
+                Socso = slips.Sum(p => p.SocsoEmployee + p.SocsoEmployer + p.SkbbkEmployee),
                 Eis = slips.Sum(p => p.EisEmployee + p.EisEmployer),
                 Pcb = slips.Sum(p => p.Pcb),
                 EmployerCost = slips.Sum(p => p.GrossPay + p.EpfEmployer + p.SocsoEmployer + p.EisEmployer),
@@ -135,6 +137,7 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
             Name = l.Name.Trim(),
             Amount = Math.Round(l.Amount, 2),
             Statutory = l.Statutory,
+            Category = l.Category,
             Source = claimIds.Contains(l.RequestId) ? l.Source : l.Source == PayLineSource.Claim ? PayLineSource.Manual : l.Source,
             RequestId = claimIds.Contains(l.RequestId) ? l.RequestId : null,
         }).ToList();
@@ -150,8 +153,9 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
             slip.SocsoEmployer = input.SocsoEmployer;
             slip.EisEmployee = input.EisEmployee;
             slip.EisEmployer = input.EisEmployer;
+            slip.SkbbkEmployee = input.SkbbkEmployee;
         }
-        PayrollService.Calculate(slip, await settings.LoadAsync());
+        PayrollService.Calculate(slip, await settings.LoadAsync(), slip.PayrollRun.Year, slip.PayrollRun.Month);
         audit.Log("Update", nameof(Payslip), id, slip.EmployeeName);
         await db.SaveChangesAsync();
         return NoContent();
@@ -173,6 +177,36 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
             "text/csv", $"bank-{run.Year}-{run.Month:D2}.csv");
     }
 
+    /// <summary>KWSP e-Caruman upload (Borang A) for i-Akaun. The contribution month is the month after the wage month.</summary>
+    [HttpGet("runs/{id:int}/kwsp.csv")]
+    public async Task<IActionResult> KwspFile(int id)
+    {
+        var run = await db.PayrollRuns.Include(r => r.Payslips).FirstOrDefaultAsync(r => r.Id == id);
+        if (run is null) return NotFound();
+        var csv = StatutoryFiles.Kwsp(run.Payslips);
+        audit.Log("Export", nameof(PayrollRun), id, "KWSP file");
+        await db.SaveChangesAsync();
+        var contribution = new DateTime(run.Year, run.Month, 1).AddMonths(1);
+        return File(Encoding.ASCII.GetBytes(csv), "text/csv", $"KWSP-{contribution:yyyyMM}.csv");
+    }
+
+    /// <summary>PERKESO ASSIST combined SOCSO + EIS (+ SKBBK) contribution text file.</summary>
+    [HttpGet("runs/{id:int}/perkeso.txt")]
+    public async Task<IActionResult> PerkesoFile(int id)
+    {
+        var run = await db.PayrollRuns.Include(r => r.Payslips).FirstOrDefaultAsync(r => r.Id == id);
+        if (run is null) return NotFound();
+        var employerCode = await db.Settings.Where(s => s.Key == "EmployerSocsoCode").Select(s => s.Value).FirstOrDefaultAsync();
+        if (string.IsNullOrWhiteSpace(employerCode))
+            return BadRequest(new { message = "Enter the PERKESO employer code under Setup → Company first." });
+        var regNo = await db.Settings.Where(s => s.Key == "CompanyRegNo").Select(s => s.Value).FirstOrDefaultAsync();
+        var text = StatutoryFiles.Perkeso(run, employerCode.Trim(), regNo?.Trim());
+        audit.Log("Export", nameof(PayrollRun), id, "PERKESO file");
+        await db.SaveChangesAsync();
+        // ASSIST rejects a file name it has seen before, so stamp the time.
+        return File(Encoding.ASCII.GetBytes(text), "text/plain", $"PERKESO-{run.Year}{run.Month:D2}-{DateTime.Now:yyyyMMddHHmm}.txt");
+    }
+
     [HttpGet("runs/{id:int}/export.xlsx")]
     public async Task<IActionResult> Export(int id)
     {
@@ -182,7 +216,7 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
         using var book = new XLWorkbook();
         var sheet = book.AddWorksheet($"Payroll {run.Year}-{run.Month:D2}");
         string[] headers = ["Employee No", "Name", "IC Number", "Department", "Basic", "Gross", "EPF (Employee)", "EPF (Employer)",
-            "SOCSO (Employee)", "SOCSO (Employer)", "EIS (Employee)", "EIS (Employer)", "PCB", "Total Deductions", "Net Pay",
+            "SOCSO (Employee)", "SOCSO (Employer)", "EIS (Employee)", "EIS (Employer)", "SKBBK (Employee)", "PCB", "Total Deductions", "Net Pay",
             "EPF No", "SOCSO No", "Tax No", "Bank", "Account No"];
         for (var i = 0; i < headers.Length; i++) sheet.Cell(1, i + 1).Value = headers[i];
         sheet.Row(1).Style.Font.Bold = true;
@@ -191,7 +225,7 @@ public class PayrollController(AppDbContext db, AuditService audit, PayrollServi
         foreach (var p in run.Payslips.OrderBy(p => p.EmployeeNo))
         {
             object?[] values = [p.EmployeeNo, p.EmployeeName, p.IcNumber, p.Department, p.BasicSalary, p.GrossPay, p.EpfEmployee, p.EpfEmployer,
-                p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.Pcb, p.TotalDeductions, p.NetPay,
+                p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.SkbbkEmployee, p.Pcb, p.TotalDeductions, p.NetPay,
                 p.EpfNo, p.SocsoNo, p.TaxNo, p.BankName, p.BankAccountNo];
             for (var i = 0; i < values.Length; i++)
             {
@@ -264,9 +298,10 @@ public class PayslipsController(AppDbContext db) : ControllerBase
             p.Id, p.PayrollRunId, p.PayrollRun!.Year, p.PayrollRun.Month, RunStatus = p.PayrollRun.Status, CompanyName = company,
             p.UserId, p.EmployeeNo, p.EmployeeName, p.Department, p.Position, p.IcNumber, p.EpfNo, p.SocsoNo, p.TaxNo, p.BankName, p.BankAccountNo,
             p.BasicSalary, p.GrossPay, p.StatutoryWage, p.StatutoryOverride,
-            p.EpfEmployee, p.EpfEmployer, p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.Pcb,
+            p.PassportNo, p.EpfCategory, p.SocsoCategory, p.EisEnabled, p.SkbbkEnabled,
+            p.EpfEmployee, p.EpfEmployer, p.SocsoEmployee, p.SocsoEmployer, p.EisEmployee, p.EisEmployer, p.SkbbkEmployee, p.Pcb,
             p.TotalDeductions, p.NetPay,
-            Lines = p.Lines.OrderBy(l => l.Kind).ThenBy(l => l.Id).Select(l => new { l.Kind, l.Name, l.Amount, l.Statutory, l.Source, l.RequestId }),
+            Lines = p.Lines.OrderBy(l => l.Kind).ThenBy(l => l.Id).Select(l => new { l.Kind, l.Name, l.Amount, l.Statutory, l.Category, l.Source, l.RequestId }),
         });
     }
 }

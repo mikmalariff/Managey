@@ -214,6 +214,11 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -389,6 +394,9 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<bool>("EisEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<string>("EmployeeName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -396,6 +404,11 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("EpfCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("EpfEmployee")
                         .HasPrecision(18, 2)
@@ -419,6 +432,9 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("PassportNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<int>("PayrollRunId")
                         .HasColumnType("int");
 
@@ -428,6 +444,18 @@ namespace Managey.Api.Migrations.SqlServer
 
                     b.Property<string>("Position")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("SkbbkEmployee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<bool>("SkbbkEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SocsoCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<decimal>("SocsoEmployee")
                         .HasPrecision(18, 2)
@@ -478,6 +506,11 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -618,12 +651,20 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<int?>("DepartmentId")
                         .HasColumnType("int");
 
+                    b.Property<bool>("EisEnabled")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("EpfCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("EpfNo")
                         .HasColumnType("nvarchar(max)");
@@ -651,6 +692,9 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<string>("PassportNo")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -662,6 +706,14 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("SkbbkEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("SocsoCategory")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");

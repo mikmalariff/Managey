@@ -197,6 +197,11 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -362,12 +367,20 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("EisEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("EmployeeName")
                         .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EpfCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("EpfEmployee")
@@ -392,6 +405,9 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PassportNo")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("PayrollRunId")
                         .HasColumnType("INTEGER");
 
@@ -400,6 +416,18 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Position")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("SkbbkEmployee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("SkbbkEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SocsoCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("SocsoEmployee")
@@ -448,6 +476,11 @@ namespace Managey.Api.Migrations.Sqlite
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
@@ -585,11 +618,19 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<int?>("DepartmentId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("EisEnabled")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Email")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EpfCategory")
+                        .IsRequired()
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EpfNo")
@@ -618,6 +659,9 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PassportNo")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PasswordHash")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -629,6 +673,14 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("SkbbkEnabled")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("SocsoCategory")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");

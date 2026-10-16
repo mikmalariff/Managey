@@ -40,6 +40,8 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
             e.HasIndex(x => x.Username).IsUnique();
             e.HasIndex(x => x.EmployeeNo).IsUnique();
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.EpfCategory).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SocsoCategory).HasConversion<string>().HasMaxLength(20);
             e.HasOne(x => x.Manager).WithMany().HasForeignKey(x => x.ManagerId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -87,6 +89,7 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<EmployeePayItem>(e =>
         {
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.UserId);
         });
         b.Entity<PayrollRun>(e =>
@@ -98,6 +101,8 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<Payslip>(e =>
         {
             e.HasIndex(x => new { x.PayrollRunId, x.UserId }).IsUnique();
+            e.Property(x => x.EpfCategory).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.SocsoCategory).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.UserId);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
         });
@@ -105,6 +110,7 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         {
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.RequestId);
         });
     }

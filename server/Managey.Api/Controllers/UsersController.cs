@@ -18,10 +18,12 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         bool IsActive, string? Password);
 
     public record PasswordInput(string Password);
-    public record PayItemInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory);
+    public record PayItemInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory, PayCategory Category);
     public record PayInput(
-        decimal? BasicSalary, decimal? MonthlyPcb, string? IcNumber, string? BankName, string? BankAccountNo,
-        string? EpfNo, string? SocsoNo, string? TaxNo, List<PayItemInput> Items);
+        decimal? BasicSalary, decimal? MonthlyPcb, string? IcNumber, string? PassportNo, string? BankName, string? BankAccountNo,
+        string? EpfNo, string? SocsoNo, string? TaxNo,
+        EpfCategory EpfCategory, SocsoCategory SocsoCategory, bool EisEnabled, bool SkbbkEnabled,
+        List<PayItemInput> Items);
     public record EntitlementInput(int LeaveTypeId, decimal? Days);
 
     public static string? PasswordProblem(string? password) =>
@@ -141,11 +143,12 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         var user = await db.Users.FindAsync(id);
         if (user is null) return NotFound();
         var items = await db.EmployeePayItems.Where(i => i.UserId == id).OrderBy(i => i.Kind).ThenBy(i => i.Id)
-            .Select(i => new { i.Kind, i.Name, i.Amount, i.Statutory }).ToListAsync();
+            .Select(i => new { i.Kind, i.Name, i.Amount, i.Statutory, i.Category }).ToListAsync();
         return Ok(new
         {
-            user.BasicSalary, user.MonthlyPcb, user.IcNumber, user.BankName, user.BankAccountNo,
-            user.EpfNo, user.SocsoNo, user.TaxNo, Items = items,
+            user.BasicSalary, user.MonthlyPcb, user.IcNumber, user.PassportNo, user.BankName, user.BankAccountNo,
+            user.EpfNo, user.SocsoNo, user.TaxNo,
+            user.EpfCategory, user.SocsoCategory, user.EisEnabled, user.SkbbkEnabled, Items = items,
         });
     }
 
@@ -159,10 +162,15 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
             return BadRequest(new { message = "Amounts cannot be negative, and every item needs a name." });
 
         ApplyPay(user, input.BasicSalary, input.MonthlyPcb, input.IcNumber, input.BankName, input.BankAccountNo, input.EpfNo, input.SocsoNo, input.TaxNo);
+        user.PassportNo = string.IsNullOrWhiteSpace(input.PassportNo) ? null : input.PassportNo.Trim();
+        user.EpfCategory = input.EpfCategory;
+        user.SocsoCategory = input.SocsoCategory;
+        user.EisEnabled = input.EisEnabled;
+        user.SkbbkEnabled = input.SkbbkEnabled;
         db.EmployeePayItems.RemoveRange(db.EmployeePayItems.Where(i => i.UserId == id));
         db.EmployeePayItems.AddRange(input.Items.Select(i => new EmployeePayItem
         {
-            UserId = id, Kind = i.Kind, Name = i.Name.Trim(), Amount = Math.Round(i.Amount, 2), Statutory = i.Statutory,
+            UserId = id, Kind = i.Kind, Name = i.Name.Trim(), Amount = Math.Round(i.Amount, 2), Statutory = i.Statutory, Category = i.Category,
         }));
         audit.Log("UpdatePay", nameof(User), id, user.Username);
         await db.SaveChangesAsync();

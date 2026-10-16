@@ -4,13 +4,13 @@ using Microsoft.EntityFrameworkCore;
 namespace Managey.Api.Services;
 
 /// <summary>
-/// Statutory rates, stored in Settings so HR can update them when the law changes.
-/// Percentages are entered as e.g. 11 for 11%.
+/// EPF rates and payroll options, stored in Settings so HR can update them when the law changes.
+/// Percentages are entered as e.g. 11 for 11%. SOCSO, EIS and SKBBK use the official tables in <see cref="PerkesoTables"/>.
 /// </summary>
 public record PayrollRates(
     decimal EpfEmployee, decimal EpfEmployerLow, decimal EpfEmployerHigh, decimal EpfEmployerThreshold,
-    decimal SocsoEmployee, decimal SocsoEmployer, decimal EisEmployee, decimal EisEmployer,
-    decimal SocsoEisCeiling, decimal DaysPerMonth);
+    decimal EpfEmployee60, decimal EpfEmployer60, decimal EpfForeignEmployee, decimal EpfForeignEmployer,
+    decimal DaysPerMonth, int SkbbkFrom);
 
 public class PayrollSettings(AppDbContext db)
 {
@@ -22,12 +22,13 @@ public class PayrollSettings(AppDbContext db)
         ["EpfEmployerLow"] = "13",
         ["EpfEmployerHigh"] = "12",
         ["EpfEmployerThreshold"] = "5000",
-        ["SocsoEmployee"] = "0.5",
-        ["SocsoEmployer"] = "1.75",
-        ["EisEmployee"] = "0.2",
-        ["EisEmployer"] = "0.2",
-        ["SocsoEisCeiling"] = "6000",
+        ["EpfEmployee60"] = "0",
+        ["EpfEmployer60"] = "4",
+        ["EpfForeignEmployee"] = "2",
+        ["EpfForeignEmployer"] = "2",
         ["DaysPerMonth"] = "26",
+        // First payroll month (yyyymm) in which the LINDUNG 24 Jam (SKBBK) employee share is deducted.
+        ["SkbbkFrom"] = "202606",
     };
 
     public async Task<Dictionary<string, decimal>> LoadRawAsync()
@@ -35,14 +36,15 @@ public class PayrollSettings(AppDbContext db)
         var stored = await db.Settings.Where(s => s.Key.StartsWith(Prefix)).ToDictionaryAsync(s => s.Key[Prefix.Length..], s => s.Value);
         return Defaults.ToDictionary(
             d => d.Key,
-            d => decimal.TryParse(stored.GetValueOrDefault(d.Key), out var v) ? v : decimal.Parse(d.Value));
+            d => decimal.TryParse(stored.GetValueOrDefault(d.Key), System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : decimal.Parse(d.Value));
     }
 
     public async Task<PayrollRates> LoadAsync()
     {
         var r = await LoadRawAsync();
         return new PayrollRates(r["EpfEmployee"], r["EpfEmployerLow"], r["EpfEmployerHigh"], r["EpfEmployerThreshold"],
-            r["SocsoEmployee"], r["SocsoEmployer"], r["EisEmployee"], r["EisEmployer"], r["SocsoEisCeiling"], r["DaysPerMonth"]);
+            r["EpfEmployee60"], r["EpfEmployer60"], r["EpfForeignEmployee"], r["EpfForeignEmployer"],
+            r["DaysPerMonth"], (int)r["SkbbkFrom"]);
     }
 }
 
@@ -96,18 +98,27 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
                 TaxNo = e.TaxNo,
                 BankName = e.BankName,
                 BankAccountNo = e.BankAccountNo,
+                PassportNo = e.PassportNo,
+                EpfCategory = e.EpfCategory,
+                SocsoCategory = e.SocsoCategory,
+                EisEnabled = e.EisEnabled,
+                SkbbkEnabled = e.SkbbkEnabled,
                 BasicSalary = e.BasicSalary ?? 0,
                 Pcb = e.MonthlyPcb ?? 0,
             };
 
             foreach (var item in recurring.Where(i => i.UserId == e.Id))
-                slip.Lines.Add(new PayslipLine { Kind = item.Kind, Name = item.Name, Amount = item.Amount, Statutory = item.Statutory, Source = PayLineSource.Recurring });
+                slip.Lines.Add(new PayslipLine
+                {
+                    Kind = item.Kind, Name = item.Name, Amount = item.Amount, Statutory = item.Statutory,
+                    Category = item.Category, Source = PayLineSource.Recurring,
+                });
 
             foreach (var claim in claims.Where(c => c.RequesterId == e.Id))
                 slip.Lines.Add(new PayslipLine
                 {
                     Kind = PayItemKind.Earning, Name = $"Claim {claim.RefNo}: {claim.Title}", Amount = claim.Amount ?? 0,
-                    Statutory = false, Source = PayLineSource.Claim, RequestId = claim.Id,
+                    Statutory = false, Category = PayCategory.Reimbursement, Source = PayLineSource.Claim, RequestId = claim.Id,
                 });
 
             decimal unpaidDays = 0;
@@ -122,16 +133,16 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
                 {
                     Kind = PayItemKind.Deduction, Name = $"Unpaid leave ({unpaidDays} day(s))",
                     Amount = Math.Round(slip.BasicSalary / rates.DaysPerMonth * unpaidDays, 2),
-                    Statutory = true, Source = PayLineSource.UnpaidLeave,
+                    Statutory = true, Category = PayCategory.Salary, Source = PayLineSource.UnpaidLeave,
                 });
 
-            Calculate(slip, rates);
+            Calculate(slip, rates, run.Year, run.Month);
             db.Payslips.Add(slip);
         }
     }
 
-    /// <summary>Recomputes totals, and EPF/SOCSO/EIS unless HR entered them by hand.</summary>
-    public static void Calculate(Payslip slip, PayrollRates rates)
+    /// <summary>Recomputes totals, and EPF/SOCSO/EIS/SKBBK unless HR entered them by hand.</summary>
+    public static void Calculate(Payslip slip, PayrollRates rates, int year, int month)
     {
         var earnings = slip.Lines.Where(l => l.Kind == PayItemKind.Earning).ToList();
         var deductions = slip.Lines.Where(l => l.Kind == PayItemKind.Deduction).ToList();
@@ -143,16 +154,27 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
         if (!slip.StatutoryOverride)
         {
             var wage = slip.StatutoryWage;
-            slip.EpfEmployee = Epf(wage, rates.EpfEmployee);
-            slip.EpfEmployer = Epf(wage, wage <= rates.EpfEmployerThreshold ? rates.EpfEmployerLow : rates.EpfEmployerHigh);
-            var capped = Math.Min(wage, rates.SocsoEisCeiling);
-            slip.SocsoEmployee = Percent(capped, rates.SocsoEmployee);
-            slip.SocsoEmployer = Percent(capped, rates.SocsoEmployer);
-            slip.EisEmployee = Percent(capped, rates.EisEmployee);
-            slip.EisEmployer = Percent(capped, rates.EisEmployer);
+            (decimal employee, decimal employer) epfRates = slip.EpfCategory switch
+            {
+                EpfCategory.Standard => (rates.EpfEmployee, wage <= rates.EpfEmployerThreshold ? rates.EpfEmployerLow : rates.EpfEmployerHigh),
+                EpfCategory.Age60Plus => (rates.EpfEmployee60, rates.EpfEmployer60),
+                EpfCategory.Foreign => (rates.EpfForeignEmployee, rates.EpfForeignEmployer),
+                _ => (0, 0),
+            };
+            slip.EpfEmployee = Epf(wage, epfRates.employee);
+            slip.EpfEmployer = Epf(wage, epfRates.employer);
+
+            var skbbk = slip.SkbbkEnabled && year * 100 + month >= rates.SkbbkFrom;
+            var perkeso = PerkesoTables.Calculate(wage, slip.SocsoCategory, slip.EisEnabled, skbbk);
+            slip.SocsoEmployer = perkeso.SocsoEmployer;
+            slip.SocsoEmployee = perkeso.SocsoEmployee;
+            slip.EisEmployer = perkeso.EisEmployer;
+            slip.EisEmployee = perkeso.EisEmployee;
+            slip.SkbbkEmployee = perkeso.SkbbkEmployee;
         }
 
-        slip.TotalDeductions = deductions.Sum(l => l.Amount) + slip.EpfEmployee + slip.SocsoEmployee + slip.EisEmployee + slip.Pcb;
+        slip.TotalDeductions = deductions.Sum(l => l.Amount)
+            + slip.EpfEmployee + slip.SocsoEmployee + slip.EisEmployee + slip.SkbbkEmployee + slip.Pcb;
         slip.NetPay = slip.GrossPay - slip.TotalDeductions;
     }
 
@@ -171,7 +193,4 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
         };
         return Math.Ceiling(basis * ratePercent / 100);
     }
-
-    private static decimal Percent(decimal amount, decimal ratePercent) =>
-        Math.Round(amount * ratePercent / 100, 2, MidpointRounding.AwayFromZero);
 }

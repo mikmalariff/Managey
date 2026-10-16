@@ -121,7 +121,13 @@ public class LeaveTypesController(AppDbContext db, AuditService audit) : Control
 [Authorize]
 public class SettingsController(AppDbContext db, AuditService audit) : ControllerBase
 {
-    private static readonly string[] Editable = ["CompanyName", "WorkStartTime", "WorkEndTime"];
+    private static readonly string[] Editable =
+    [
+        "CompanyName", "WorkStartTime", "WorkEndTime",
+        // Employer details for statutory files and the EA form.
+        "CompanyRegNo", "CompanyAddress", "CompanyPhone", "EmployerEpfNo", "EmployerSocsoCode", "EmployerTaxNo",
+        "EaSignatoryName", "EaSignatoryPosition",
+    ];
 
     [HttpGet]
     public async Task<IActionResult> Get() =>

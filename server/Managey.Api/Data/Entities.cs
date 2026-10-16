@@ -16,6 +16,33 @@ public enum PayrollStatus { Draft, Finalized }
 
 public enum PayLineSource { Manual, Recurring, Claim, UnpaidLeave }
 
+/// <summary>Which EPF rates apply: standard (citizens/PR under 60), aged 60 and above, foreign worker, or not contributing.</summary>
+public enum EpfCategory { Standard, Age60Plus, Foreign, None }
+
+/// <summary>SOCSO First Category (employment injury + invalidity), Second (employment injury only), or not covered.</summary>
+public enum SocsoCategory { First, Second, None }
+
+/// <summary>How a pay line is reported on the EA form.</summary>
+public enum PayCategory
+{
+    /// <summary>B1(a) salary, wages, overtime.</summary>
+    Salary,
+    /// <summary>B1(b) fees, commission, bonus.</summary>
+    Bonus,
+    /// <summary>B1(c) taxable allowances and perquisites.</summary>
+    Allowance,
+    /// <summary>F: tax-exempt allowances and benefits.</summary>
+    Exempt,
+    /// <summary>Reimbursed expenses, e.g. claims. Not income.</summary>
+    Reimbursement,
+    /// <summary>D3: zakat deducted from salary.</summary>
+    Zakat,
+    /// <summary>D2: CP38 deduction ordered by LHDN.</summary>
+    Cp38,
+    /// <summary>Any other deduction (loans, advances...).</summary>
+    Other,
+}
+
 public class Department
 {
     public int Id { get; set; }
@@ -51,6 +78,12 @@ public class User
     public string? EpfNo { get; set; }
     public string? SocsoNo { get; set; }
     public string? TaxNo { get; set; }
+    public string? PassportNo { get; set; }
+    public EpfCategory EpfCategory { get; set; } = EpfCategory.Standard;
+    public SocsoCategory SocsoCategory { get; set; } = SocsoCategory.First;
+    public bool EisEnabled { get; set; } = true;
+    /// <summary>LINDUNG 24 Jam (SKBBK) employee contribution; employees may opt out.</summary>
+    public bool SkbbkEnabled { get; set; } = true;
 }
 
 /// <summary>A fixed allowance or deduction added to the employee's payslip every month.</summary>
@@ -63,6 +96,7 @@ public class EmployeePayItem
     public decimal Amount { get; set; }
     /// <summary>Whether the amount counts as wages for EPF, SOCSO and EIS.</summary>
     public bool Statutory { get; set; } = true;
+    public PayCategory Category { get; set; } = PayCategory.Allowance;
 }
 
 public class PayrollRun
@@ -96,6 +130,11 @@ public class Payslip
     public string? TaxNo { get; set; }
     public string? BankName { get; set; }
     public string? BankAccountNo { get; set; }
+    public string? PassportNo { get; set; }
+    public EpfCategory EpfCategory { get; set; }
+    public SocsoCategory SocsoCategory { get; set; }
+    public bool EisEnabled { get; set; }
+    public bool SkbbkEnabled { get; set; }
 
     public decimal BasicSalary { get; set; }
     public decimal GrossPay { get; set; }
@@ -108,6 +147,7 @@ public class Payslip
     public decimal SocsoEmployer { get; set; }
     public decimal EisEmployee { get; set; }
     public decimal EisEmployer { get; set; }
+    public decimal SkbbkEmployee { get; set; }
     public decimal Pcb { get; set; }
     public decimal TotalDeductions { get; set; }
     public decimal NetPay { get; set; }
@@ -123,6 +163,7 @@ public class PayslipLine
     public string Name { get; set; } = "";
     public decimal Amount { get; set; }
     public bool Statutory { get; set; }
+    public PayCategory Category { get; set; } = PayCategory.Allowance;
     public PayLineSource Source { get; set; }
     /// <summary>The claim this line reimburses, so a claim is only ever paid once.</summary>
     public int? RequestId { get; set; }

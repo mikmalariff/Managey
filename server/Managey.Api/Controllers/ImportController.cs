@@ -34,6 +34,7 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         ("Basic Salary", "3500", "Monthly, in RM."),
         ("Monthly PCB", "45.50", "Monthly tax deduction (MTD), in RM."),
         ("IC Number", "900101-14-5678", ""),
+        ("Passport No", "", "Foreign employees without an IC."),
         ("Bank Name", "Maybank", ""),
         ("Bank Account No", "512345678901", "Format the column as Text so leading zeros are kept."),
         ("EPF No", "12345678", ""),
@@ -170,6 +171,8 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
                 basic ?? user.BasicSalary, pcb ?? user.MonthlyPcb,
                 Get(r, "IC Number") ?? user.IcNumber, Get(r, "Bank Name") ?? user.BankName, Get(r, "Bank Account No") ?? user.BankAccountNo,
                 Get(r, "EPF No") ?? user.EpfNo, Get(r, "SOCSO No") ?? user.SocsoNo, Get(r, "Tax No") ?? user.TaxNo);
+
+            if (Get(r, "Passport No") is { } passport) user.PassportNo = passport;
 
             var tempPassword = isNew && password is null ? GeneratePassword() : null;
             plans.Add((r, user, isNew, password ?? tempPassword, managerNo, Get(r, "Department")));
