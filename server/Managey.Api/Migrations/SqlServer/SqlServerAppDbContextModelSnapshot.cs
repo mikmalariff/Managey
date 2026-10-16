@@ -138,6 +138,102 @@ namespace Managey.Api.Migrations.SqlServer
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionBand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Employee")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("Employer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<int>("SchemeId")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Step")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("UpTo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchemeId");
+
+                    b.ToTable("ContributionBands");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.ContributionScheme", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("DefaultForNewEmployees")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("datetime2");
+
+                    b.Property<decimal>("EmployeeRate")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<decimal>("EmployerRate")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("decimal(9,4)");
+
+                    b.Property<string>("EmployerRef")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("MemberNoRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Rounding")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("WageCeiling")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ContributionSchemes");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -202,6 +298,41 @@ namespace Managey.Api.Migrations.SqlServer
                     b.ToTable("Documents");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.EmployeeContribution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal?>("EmployeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal?>("EmployerAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("MemberNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("SchemeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchemeId");
+
+                    b.HasIndex("UserId", "SchemeId")
+                        .IsUnique();
+
+                    b.ToTable("EmployeeContributions");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.EmployeePayItem", b =>
                 {
                     b.Property<int>("Id")
@@ -213,11 +344,6 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -386,17 +512,6 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<string>("Department")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<decimal>("EisEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("EisEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool>("EisEnabled")
-                        .HasColumnType("bit");
-
                     b.Property<string>("EmployeeName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
@@ -405,21 +520,9 @@ namespace Managey.Api.Migrations.SqlServer
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("EpfCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal>("EpfEmployee")
+                    b.Property<decimal>("EmployerContributions")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("EpfEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("EpfNo")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("GrossPay")
                         .HasPrecision(18, 2)
@@ -438,34 +541,7 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<int>("PayrollRunId")
                         .HasColumnType("int");
 
-                    b.Property<decimal>("Pcb")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<string>("Position")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<decimal>("SkbbkEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<bool>("SkbbkEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SocsoCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<decimal>("SocsoEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("SocsoEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("SocsoNo")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("StatutoryOverride")
@@ -495,6 +571,49 @@ namespace Managey.Api.Migrations.SqlServer
                     b.ToTable("Payslips");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.PayslipContribution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<decimal>("Employee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<decimal>("Employer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("MemberNo")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("PayslipId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("SchemeId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayslipId");
+
+                    b.ToTable("PayslipContributions");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
                 {
                     b.Property<int>("Id")
@@ -506,11 +625,6 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("Kind")
                         .IsRequired()
@@ -651,23 +765,12 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<int?>("DepartmentId")
                         .HasColumnType("int");
 
-                    b.Property<bool>("EisEnabled")
-                        .HasColumnType("bit");
-
                     b.Property<string>("Email")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("EpfCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("EpfNo")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("FullName")
                         .IsRequired()
@@ -688,10 +791,6 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Property<int?>("ManagerId")
                         .HasColumnType("int");
 
-                    b.Property<decimal?>("MonthlyPcb")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<string>("PassportNo")
                         .HasColumnType("nvarchar(max)");
 
@@ -709,17 +808,6 @@ namespace Managey.Api.Migrations.SqlServer
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("SkbbkEnabled")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("SocsoCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("SocsoNo")
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("TaxNo")
                         .HasColumnType("nvarchar(max)");
@@ -808,6 +896,15 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionBand", b =>
+                {
+                    b.HasOne("Managey.Api.Data.ContributionScheme", null)
+                        .WithMany("Bands")
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Document", b =>
                 {
                     b.HasOne("Managey.Api.Data.Request", "Request")
@@ -826,6 +923,23 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Navigation("UploadedBy");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.EmployeeContribution", b =>
+                {
+                    b.HasOne("Managey.Api.Data.ContributionScheme", "Scheme")
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Managey.Api.Data.User", null)
+                        .WithMany("Contributions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scheme");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
                 {
                     b.HasOne("Managey.Api.Data.PayrollRun", "PayrollRun")
@@ -835,6 +949,15 @@ namespace Managey.Api.Migrations.SqlServer
                         .IsRequired();
 
                     b.Navigation("PayrollRun");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayslipContribution", b =>
+                {
+                    b.HasOne("Managey.Api.Data.Payslip", null)
+                        .WithMany("Contributions")
+                        .HasForeignKey("PayslipId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
@@ -880,6 +1003,11 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Navigation("Manager");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionScheme", b =>
+                {
+                    b.Navigation("Bands");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.PayrollRun", b =>
                 {
                     b.Navigation("Payslips");
@@ -887,6 +1015,8 @@ namespace Managey.Api.Migrations.SqlServer
 
             modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
                 {
+                    b.Navigation("Contributions");
+
                     b.Navigation("Lines");
                 });
 
@@ -895,6 +1025,11 @@ namespace Managey.Api.Migrations.SqlServer
                     b.Navigation("Attachments");
 
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.User", b =>
+                {
+                    b.Navigation("Contributions");
                 });
 #pragma warning restore 612, 618
         }

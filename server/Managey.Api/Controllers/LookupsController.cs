@@ -123,10 +123,11 @@ public class SettingsController(AppDbContext db, AuditService audit) : Controlle
 {
     private static readonly string[] Editable =
     [
-        "CompanyName", "WorkStartTime", "WorkEndTime",
-        // Employer details for statutory files and the EA form.
-        "CompanyRegNo", "CompanyAddress", "CompanyPhone", "EmployerEpfNo", "EmployerSocsoCode", "EmployerTaxNo",
-        "EaSignatoryName", "EaSignatoryPosition",
+        "CompanyName", "WorkStartTime", "WorkEndTime", "CompanyRegNo", "CompanyAddress", "CompanyPhone",
+        // ISO 4217 code, e.g. MYR, SGD, USD.
+        "Currency",
+        // Working days as day numbers, Sunday = 0: "1,2,3,4,5" for Monday–Friday.
+        "WorkDays",
     ];
 
     [HttpGet]
@@ -142,9 +143,14 @@ public class SettingsController(AppDbContext db, AuditService audit) : Controlle
             if (!Editable.Contains(key)) continue;
             if (key is "WorkStartTime" or "WorkEndTime" && !TimeOnly.TryParse(value, out _))
                 return BadRequest(new { message = $"{key} must be a time such as 09:00." });
+            if (key == "Currency" && (value is null || !System.Text.RegularExpressions.Regex.IsMatch(value, "^[A-Za-z]{3}$")))
+                return BadRequest(new { message = "Currency must be a 3-letter code such as MYR or USD." });
+            if (key == "WorkDays" && LeaveService.ParseWorkDays(value).Count == 0)
+                return BadRequest(new { message = "Choose at least one working day." });
             var setting = await db.Settings.FindAsync(key);
-            if (setting is null) db.Settings.Add(new Setting { Key = key, Value = value });
-            else setting.Value = value;
+            var stored = key == "Currency" ? value!.ToUpperInvariant() : value;
+            if (setting is null) db.Settings.Add(new Setting { Key = key, Value = stored });
+            else setting.Value = stored;
         }
         audit.Log("Update", nameof(Setting), null, string.Join(", ", values.Keys));
         await db.SaveChangesAsync();

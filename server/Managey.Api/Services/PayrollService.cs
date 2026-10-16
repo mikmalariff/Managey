@@ -1,50 +1,26 @@
+using System.Globalization;
 using Managey.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
 namespace Managey.Api.Services;
 
-/// <summary>
-/// EPF rates and payroll options, stored in Settings so HR can update them when the law changes.
-/// Percentages are entered as e.g. 11 for 11%. SOCSO, EIS and SKBBK use the official tables in <see cref="PerkesoTables"/>.
-/// </summary>
-public record PayrollRates(
-    decimal EpfEmployee, decimal EpfEmployerLow, decimal EpfEmployerHigh, decimal EpfEmployerThreshold,
-    decimal EpfEmployee60, decimal EpfEmployer60, decimal EpfForeignEmployee, decimal EpfForeignEmployer,
-    decimal DaysPerMonth, int SkbbkFrom);
-
+/// <summary>General payroll options. Contribution rules live in <see cref="ContributionScheme"/>.</summary>
 public class PayrollSettings(AppDbContext db)
 {
     public const string Prefix = "Payroll.";
 
     public static readonly Dictionary<string, string> Defaults = new()
     {
-        ["EpfEmployee"] = "11",
-        ["EpfEmployerLow"] = "13",
-        ["EpfEmployerHigh"] = "12",
-        ["EpfEmployerThreshold"] = "5000",
-        ["EpfEmployee60"] = "0",
-        ["EpfEmployer60"] = "4",
-        ["EpfForeignEmployee"] = "2",
-        ["EpfForeignEmployer"] = "2",
+        // Used to work out a daily rate for unpaid leave: basic salary ÷ days per month.
         ["DaysPerMonth"] = "26",
-        // First payroll month (yyyymm) in which the LINDUNG 24 Jam (SKBBK) employee share is deducted.
-        ["SkbbkFrom"] = "202606",
     };
 
-    public async Task<Dictionary<string, decimal>> LoadRawAsync()
+    public async Task<Dictionary<string, decimal>> LoadAsync()
     {
         var stored = await db.Settings.Where(s => s.Key.StartsWith(Prefix)).ToDictionaryAsync(s => s.Key[Prefix.Length..], s => s.Value);
         return Defaults.ToDictionary(
             d => d.Key,
-            d => decimal.TryParse(stored.GetValueOrDefault(d.Key), System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : decimal.Parse(d.Value));
-    }
-
-    public async Task<PayrollRates> LoadAsync()
-    {
-        var r = await LoadRawAsync();
-        return new PayrollRates(r["EpfEmployee"], r["EpfEmployerLow"], r["EpfEmployerHigh"], r["EpfEmployerThreshold"],
-            r["EpfEmployee60"], r["EpfEmployer60"], r["EpfForeignEmployee"], r["EpfForeignEmployer"],
-            r["DaysPerMonth"], (int)r["SkbbkFrom"]);
+            d => decimal.TryParse(stored.GetValueOrDefault(d.Key), CultureInfo.InvariantCulture, out var v) ? v : decimal.Parse(d.Value, CultureInfo.InvariantCulture));
     }
 }
 
@@ -53,7 +29,7 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
     /// <summary>Builds a payslip for every active employee with a basic salary. Replaces existing draft slips.</summary>
     public async Task GenerateAsync(PayrollRun run)
     {
-        var rates = await settings.LoadAsync();
+        var daysPerMonth = (await settings.LoadAsync())["DaysPerMonth"];
         var monthStart = new DateTime(run.Year, run.Month, 1);
         var monthEnd = monthStart.AddMonths(1).AddDays(-1);
 
@@ -62,10 +38,12 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
 
         var employees = await db.Users
             .Include(u => u.Department)
+            .Include(u => u.Contributions)
             .Where(u => u.IsActive && u.BasicSalary > 0)
             .OrderBy(u => u.EmployeeNo)
             .ToListAsync();
         var ids = employees.Select(e => e.Id).ToList();
+        var schemes = await LoadSchemesAsync();
 
         var recurring = await db.EmployeePayItems.Where(i => ids.Contains(i.UserId)).ToListAsync();
 
@@ -93,32 +71,24 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
                 Department = e.Department?.Name,
                 Position = e.Position,
                 IcNumber = e.IcNumber,
-                EpfNo = e.EpfNo,
-                SocsoNo = e.SocsoNo,
+                PassportNo = e.PassportNo,
                 TaxNo = e.TaxNo,
                 BankName = e.BankName,
                 BankAccountNo = e.BankAccountNo,
-                PassportNo = e.PassportNo,
-                EpfCategory = e.EpfCategory,
-                SocsoCategory = e.SocsoCategory,
-                EisEnabled = e.EisEnabled,
-                SkbbkEnabled = e.SkbbkEnabled,
                 BasicSalary = e.BasicSalary ?? 0,
-                Pcb = e.MonthlyPcb ?? 0,
             };
 
             foreach (var item in recurring.Where(i => i.UserId == e.Id))
                 slip.Lines.Add(new PayslipLine
                 {
-                    Kind = item.Kind, Name = item.Name, Amount = item.Amount, Statutory = item.Statutory,
-                    Category = item.Category, Source = PayLineSource.Recurring,
+                    Kind = item.Kind, Name = item.Name, Amount = item.Amount, Statutory = item.Statutory, Source = PayLineSource.Recurring,
                 });
 
             foreach (var claim in claims.Where(c => c.RequesterId == e.Id))
                 slip.Lines.Add(new PayslipLine
                 {
                     Kind = PayItemKind.Earning, Name = $"Claim {claim.RefNo}: {claim.Title}", Amount = claim.Amount ?? 0,
-                    Statutory = false, Category = PayCategory.Reimbursement, Source = PayLineSource.Claim, RequestId = claim.Id,
+                    Statutory = false, Source = PayLineSource.Claim, RequestId = claim.Id,
                 });
 
             decimal unpaidDays = 0;
@@ -128,21 +98,31 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
                 var to = l.EndDate!.Value > monthEnd ? monthEnd : l.EndDate.Value;
                 unpaidDays += await leave.CountWorkingDaysAsync(from, to, l.HalfDay);
             }
-            if (unpaidDays > 0 && rates.DaysPerMonth > 0)
+            if (unpaidDays > 0 && daysPerMonth > 0)
                 slip.Lines.Add(new PayslipLine
                 {
                     Kind = PayItemKind.Deduction, Name = $"Unpaid leave ({unpaidDays} day(s))",
-                    Amount = Math.Round(slip.BasicSalary / rates.DaysPerMonth * unpaidDays, 2),
-                    Statutory = true, Category = PayCategory.Salary, Source = PayLineSource.UnpaidLeave,
+                    Amount = Math.Round(slip.BasicSalary / daysPerMonth * unpaidDays, 2),
+                    Statutory = true, Source = PayLineSource.UnpaidLeave,
                 });
 
-            Calculate(slip, rates, run.Year, run.Month);
+            Calculate(slip, schemes, e.Contributions, monthStart);
             db.Payslips.Add(slip);
         }
     }
 
-    /// <summary>Recomputes totals, and EPF/SOCSO/EIS/SKBBK unless HR entered them by hand.</summary>
-    public static void Calculate(Payslip slip, PayrollRates rates, int year, int month)
+    /// <summary>Recalculates one payslip after HR edits it, using the employee's current scheme memberships.</summary>
+    public async Task RecalculateAsync(Payslip slip, int year, int month)
+    {
+        var memberships = await db.EmployeeContributions.Where(c => c.UserId == slip.UserId).ToListAsync();
+        Calculate(slip, await LoadSchemesAsync(), memberships, new DateTime(year, month, 1));
+    }
+
+    private Task<List<ContributionScheme>> LoadSchemesAsync() =>
+        db.ContributionSchemes.Include(s => s.Bands).Where(s => s.IsActive).OrderBy(s => s.SortOrder).ThenBy(s => s.Id).ToListAsync();
+
+    /// <summary>Recomputes totals, and the contributions unless HR entered them by hand.</summary>
+    public static void Calculate(Payslip slip, List<ContributionScheme> schemes, IEnumerable<EmployeeContribution> memberships, DateTime month)
     {
         var earnings = slip.Lines.Where(l => l.Kind == PayItemKind.Earning).ToList();
         var deductions = slip.Lines.Where(l => l.Kind == PayItemKind.Deduction).ToList();
@@ -153,44 +133,75 @@ public class PayrollService(AppDbContext db, LeaveService leave, PayrollSettings
 
         if (!slip.StatutoryOverride)
         {
-            var wage = slip.StatutoryWage;
-            (decimal employee, decimal employer) epfRates = slip.EpfCategory switch
+            slip.Contributions.Clear();
+            var byScheme = memberships.ToDictionary(m => m.SchemeId);
+            foreach (var scheme in schemes)
             {
-                EpfCategory.Standard => (rates.EpfEmployee, wage <= rates.EpfEmployerThreshold ? rates.EpfEmployerLow : rates.EpfEmployerHigh),
-                EpfCategory.Age60Plus => (rates.EpfEmployee60, rates.EpfEmployer60),
-                EpfCategory.Foreign => (rates.EpfForeignEmployee, rates.EpfForeignEmployer),
-                _ => (0, 0),
-            };
-            slip.EpfEmployee = Epf(wage, epfRates.employee);
-            slip.EpfEmployer = Epf(wage, epfRates.employer);
-
-            var skbbk = slip.SkbbkEnabled && year * 100 + month >= rates.SkbbkFrom;
-            var perkeso = PerkesoTables.Calculate(wage, slip.SocsoCategory, slip.EisEnabled, skbbk);
-            slip.SocsoEmployer = perkeso.SocsoEmployer;
-            slip.SocsoEmployee = perkeso.SocsoEmployee;
-            slip.EisEmployer = perkeso.EisEmployer;
-            slip.EisEmployee = perkeso.EisEmployee;
-            slip.SkbbkEmployee = perkeso.SkbbkEmployee;
+                if (!byScheme.TryGetValue(scheme.Id, out var member)) continue;
+                if (scheme.EffectiveFrom is { } from && month < new DateTime(from.Year, from.Month, 1)) continue;
+                var (employee, employer) = ContributionCalculator.Compute(scheme, slip.StatutoryWage, member);
+                if (employee == 0 && employer == 0) continue;
+                slip.Contributions.Add(new PayslipContribution
+                {
+                    SchemeId = scheme.Id, Name = scheme.Name, Code = scheme.Code, MemberNo = member.MemberNo,
+                    Employee = employee, Employer = employer, SortOrder = scheme.SortOrder,
+                });
+            }
         }
 
-        slip.TotalDeductions = deductions.Sum(l => l.Amount)
-            + slip.EpfEmployee + slip.SocsoEmployee + slip.EisEmployee + slip.SkbbkEmployee + slip.Pcb;
+        slip.TotalDeductions = deductions.Sum(l => l.Amount) + slip.Contributions.Sum(c => c.Employee);
+        slip.EmployerContributions = slip.Contributions.Sum(c => c.Employer);
         slip.NetPay = slip.GrossPay - slip.TotalDeductions;
     }
+}
 
-    /// <summary>
-    /// EPF follows the Third Schedule approach: wages are rounded up to their band (RM20 up to RM5,000,
-    /// RM100 up to RM20,000), the rate is applied, and the result is rounded up to the next ringgit.
-    /// </summary>
-    public static decimal Epf(decimal wage, decimal ratePercent)
+public static class ContributionCalculator
+{
+    public static (decimal Employee, decimal Employer) Compute(ContributionScheme s, decimal wage, EmployeeContribution? member)
     {
-        if (wage <= 10 || ratePercent <= 0) return 0;
-        var basis = wage switch
+        var capped = s.WageCeiling is > 0 ? Math.Min(wage, s.WageCeiling.Value) : wage;
+        switch (s.Method)
         {
-            <= 5000 => Math.Ceiling(wage / 20) * 20,
-            <= 20000 => Math.Ceiling(wage / 100) * 100,
-            _ => wage,
+            case ContributionMethod.Percentage:
+                return (Round(capped * s.EmployeeRate / 100, s.Rounding), Round(capped * s.EmployerRate / 100, s.Rounding));
+
+            case ContributionMethod.RateBands:
+            {
+                if (FindBand(s, wage) is not { } band) return (0, 0);
+                var basis = band.Step > 0 ? Math.Ceiling(capped / band.Step) * band.Step : capped;
+                return (Round(basis * band.Employee / 100, s.Rounding), Round(basis * band.Employer / 100, s.Rounding));
+            }
+
+            case ContributionMethod.AmountBands:
+                return FindBand(s, capped) is { } row ? (row.Employee, row.Employer) : (0, 0);
+
+            case ContributionMethod.Fixed:
+                return (s.EmployeeRate, s.EmployerRate);
+
+            case ContributionMethod.PerEmployee:
+                return (member?.EmployeeAmount ?? 0, member?.EmployerAmount ?? 0);
+
+            default:
+                return (0, 0);
+        }
+    }
+
+    /// <summary>The band whose range holds the wage; wages above the last band use the last band; no wages, no band.</summary>
+    public static ContributionBand? FindBand(ContributionScheme s, decimal wage)
+    {
+        if (wage <= 0 || s.Bands.Count == 0) return null;
+        var bands = s.Bands.OrderBy(b => b.UpTo).ToList();
+        return bands.FirstOrDefault(b => wage <= b.UpTo) ?? bands[^1];
+    }
+
+    private static decimal Round(decimal value, ContributionRounding rounding)
+    {
+        var cents = Math.Round(value, 2, MidpointRounding.AwayFromZero);
+        return rounding switch
+        {
+            ContributionRounding.NearestWhole => Math.Round(cents, 0, MidpointRounding.AwayFromZero),
+            ContributionRounding.UpWhole => Math.Ceiling(cents),
+            _ => cents,
         };
-        return Math.Ceiling(basis * ratePercent / 100);
     }
 }

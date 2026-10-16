@@ -7,15 +7,25 @@ public record LeaveBalance(int LeaveTypeId, string LeaveType, decimal Entitlemen
 
 public class LeaveService(AppDbContext db)
 {
-    /// <summary>Counts Monday–Friday days between two dates, inclusive, skipping public holidays.</summary>
+    public const string DefaultWorkDays = "1,2,3,4,5";
+
+    /// <summary>Parses "1,2,3,4,5" (Sunday = 0) into days of the week.</summary>
+    public static HashSet<DayOfWeek> ParseWorkDays(string? value) =>
+        (value ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(v => int.TryParse(v, out var n) && n is >= 0 and <= 6 ? (DayOfWeek?)n : null)
+            .Where(d => d is not null).Select(d => d!.Value).ToHashSet();
+
+    /// <summary>Counts the company's working days between two dates, inclusive, skipping public holidays.</summary>
     public async Task<decimal> CountWorkingDaysAsync(DateTime start, DateTime end, bool halfDay)
     {
+        var setting = await db.Settings.Where(s => s.Key == "WorkDays").Select(s => s.Value).FirstOrDefaultAsync();
+        var workDays = ParseWorkDays(setting ?? DefaultWorkDays);
         var holidays = (await db.Holidays.Where(h => h.Date >= start.Date && h.Date <= end.Date).Select(h => h.Date).ToListAsync())
             .Select(d => d.Date).ToHashSet();
         decimal days = 0;
         for (var d = start.Date; d <= end.Date; d = d.AddDays(1))
         {
-            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && !holidays.Contains(d)) days++;
+            if (workDays.Contains(d.DayOfWeek) && !holidays.Contains(d)) days++;
         }
         return halfDay && days == 1 ? 0.5m : days;
     }

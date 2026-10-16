@@ -18,12 +18,11 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         bool IsActive, string? Password);
 
     public record PasswordInput(string Password);
-    public record PayItemInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory, PayCategory Category);
+    public record PayItemInput(PayItemKind Kind, string Name, decimal Amount, bool Statutory);
+    public record MembershipInput(int SchemeId, string? MemberNo, decimal? EmployeeAmount, decimal? EmployerAmount);
     public record PayInput(
-        decimal? BasicSalary, decimal? MonthlyPcb, string? IcNumber, string? PassportNo, string? BankName, string? BankAccountNo,
-        string? EpfNo, string? SocsoNo, string? TaxNo,
-        EpfCategory EpfCategory, SocsoCategory SocsoCategory, bool EisEnabled, bool SkbbkEnabled,
-        List<PayItemInput> Items);
+        decimal? BasicSalary, string? IcNumber, string? PassportNo, string? TaxNo, string? BankName, string? BankAccountNo,
+        List<PayItemInput> Items, List<MembershipInput> Contributions);
     public record EntitlementInput(int LeaveTypeId, decimal? Days);
 
     public static string? PasswordProblem(string? password) =>
@@ -73,6 +72,7 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
         user.PasswordHash = hasher.HashPassword(user, input.Password!);
         db.Users.Add(user);
         await db.SaveChangesAsync();
+        await EnrolInDefaultSchemesAsync(db, [user.Id]);
 
         audit.Log("Create", nameof(User), user.Id, $"{user.Username} ({user.Role})");
         await db.SaveChangesAsync();
@@ -140,15 +140,14 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
     [Authorize(Roles = Roles.AdminOrHR)]
     public async Task<IActionResult> GetPay(int id)
     {
-        var user = await db.Users.FindAsync(id);
+        var user = await db.Users.Include(u => u.Contributions).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
         var items = await db.EmployeePayItems.Where(i => i.UserId == id).OrderBy(i => i.Kind).ThenBy(i => i.Id)
-            .Select(i => new { i.Kind, i.Name, i.Amount, i.Statutory, i.Category }).ToListAsync();
+            .Select(i => new { i.Kind, i.Name, i.Amount, i.Statutory }).ToListAsync();
         return Ok(new
         {
-            user.BasicSalary, user.MonthlyPcb, user.IcNumber, user.PassportNo, user.BankName, user.BankAccountNo,
-            user.EpfNo, user.SocsoNo, user.TaxNo,
-            user.EpfCategory, user.SocsoCategory, user.EisEnabled, user.SkbbkEnabled, Items = items,
+            user.BasicSalary, user.IcNumber, user.PassportNo, user.TaxNo, user.BankName, user.BankAccountNo, Items = items,
+            Contributions = user.Contributions.Select(c => new { c.SchemeId, c.MemberNo, c.EmployeeAmount, c.EmployerAmount }),
         });
     }
 
@@ -156,38 +155,53 @@ public class UsersController(AppDbContext db, IPasswordHasher<User> hasher, Audi
     [Authorize(Roles = Roles.AdminOrHR)]
     public async Task<IActionResult> UpdatePay(int id, PayInput input)
     {
-        var user = await db.Users.FindAsync(id);
+        var user = await db.Users.Include(u => u.Contributions).FirstOrDefaultAsync(u => u.Id == id);
         if (user is null) return NotFound();
-        if (input.BasicSalary < 0 || input.MonthlyPcb < 0 || input.Items.Any(i => i.Amount < 0 || string.IsNullOrWhiteSpace(i.Name)))
+        if (input.BasicSalary < 0 || input.Items.Any(i => i.Amount < 0 || string.IsNullOrWhiteSpace(i.Name))
+            || input.Contributions.Any(c => c.EmployeeAmount < 0 || c.EmployerAmount < 0))
             return BadRequest(new { message = "Amounts cannot be negative, and every item needs a name." });
+        var schemeIds = await db.ContributionSchemes.Select(s => s.Id).ToListAsync();
+        if (input.Contributions.Any(c => !schemeIds.Contains(c.SchemeId))) return BadRequest(new { message = "Unknown contribution scheme." });
 
-        ApplyPay(user, input.BasicSalary, input.MonthlyPcb, input.IcNumber, input.BankName, input.BankAccountNo, input.EpfNo, input.SocsoNo, input.TaxNo);
-        user.PassportNo = string.IsNullOrWhiteSpace(input.PassportNo) ? null : input.PassportNo.Trim();
-        user.EpfCategory = input.EpfCategory;
-        user.SocsoCategory = input.SocsoCategory;
-        user.EisEnabled = input.EisEnabled;
-        user.SkbbkEnabled = input.SkbbkEnabled;
+        ApplyPay(user, input.BasicSalary, input.IcNumber, input.PassportNo, input.TaxNo, input.BankName, input.BankAccountNo);
         db.EmployeePayItems.RemoveRange(db.EmployeePayItems.Where(i => i.UserId == id));
         db.EmployeePayItems.AddRange(input.Items.Select(i => new EmployeePayItem
         {
-            UserId = id, Kind = i.Kind, Name = i.Name.Trim(), Amount = Math.Round(i.Amount, 2), Statutory = i.Statutory, Category = i.Category,
+            UserId = id, Kind = i.Kind, Name = i.Name.Trim(), Amount = Math.Round(i.Amount, 2), Statutory = i.Statutory,
         }));
+        db.EmployeeContributions.RemoveRange(user.Contributions);
+        user.Contributions = input.Contributions.DistinctBy(c => c.SchemeId).Select(c => new EmployeeContribution
+        {
+            UserId = id, SchemeId = c.SchemeId,
+            MemberNo = string.IsNullOrWhiteSpace(c.MemberNo) ? null : c.MemberNo.Trim(),
+            EmployeeAmount = c.EmployeeAmount is null ? null : Math.Round(c.EmployeeAmount.Value, 2),
+            EmployerAmount = c.EmployerAmount is null ? null : Math.Round(c.EmployerAmount.Value, 2),
+        }).ToList();
         audit.Log("UpdatePay", nameof(User), id, user.Username);
         await db.SaveChangesAsync();
         return NoContent();
     }
 
-    internal static void ApplyPay(User user, decimal? basic, decimal? pcb, string? ic, string? bank, string? account, string? epf, string? socso, string? tax)
+    internal static void ApplyPay(User user, decimal? basic, string? ic, string? passport, string? tax, string? bank, string? account)
     {
         static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
         user.BasicSalary = basic is null ? null : Math.Round(basic.Value, 2);
-        user.MonthlyPcb = pcb is null ? null : Math.Round(pcb.Value, 2);
         user.IcNumber = Clean(ic);
+        user.PassportNo = Clean(passport);
+        user.TaxNo = Clean(tax);
         user.BankName = Clean(bank);
         user.BankAccountNo = Clean(account);
-        user.EpfNo = Clean(epf);
-        user.SocsoNo = Clean(socso);
-        user.TaxNo = Clean(tax);
+    }
+
+    /// <summary>Adds new employees to every active scheme marked as default for new employees.</summary>
+    internal static async Task EnrolInDefaultSchemesAsync(AppDbContext db, IReadOnlyCollection<int> userIds)
+    {
+        var schemes = await db.ContributionSchemes.Where(s => s.IsActive && s.DefaultForNewEmployees).Select(s => s.Id).ToListAsync();
+        var existing = await db.EmployeeContributions.Where(c => userIds.Contains(c.UserId)).Select(c => new { c.UserId, c.SchemeId }).ToListAsync();
+        foreach (var userId in userIds)
+            foreach (var schemeId in schemes.Where(s => !existing.Any(e => e.UserId == userId && e.SchemeId == s)))
+                db.EmployeeContributions.Add(new EmployeeContribution { UserId = userId, SchemeId = schemeId });
+        await db.SaveChangesAsync();
     }
 
     /// <summary>HR data is visible to the person themselves, HR/admin, and their direct manager.</summary>

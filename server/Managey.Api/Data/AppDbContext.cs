@@ -24,6 +24,10 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
     public DbSet<PayrollRun> PayrollRuns => Set<PayrollRun>();
     public DbSet<Payslip> Payslips => Set<Payslip>();
     public DbSet<PayslipLine> PayslipLines => Set<PayslipLine>();
+    public DbSet<PayslipContribution> PayslipContributions => Set<PayslipContribution>();
+    public DbSet<ContributionScheme> ContributionSchemes => Set<ContributionScheme>();
+    public DbSet<ContributionBand> ContributionBands => Set<ContributionBand>();
+    public DbSet<EmployeeContribution> EmployeeContributions => Set<EmployeeContribution>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -40,8 +44,7 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
             e.HasIndex(x => x.Username).IsUnique();
             e.HasIndex(x => x.EmployeeNo).IsUnique();
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.EpfCategory).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.SocsoCategory).HasConversion<string>().HasMaxLength(20);
+            e.HasMany(x => x.Contributions).WithOne().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Manager).WithMany().HasForeignKey(x => x.ManagerId).OnDelete(DeleteBehavior.NoAction);
             e.HasOne(x => x.Department).WithMany().HasForeignKey(x => x.DepartmentId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -89,7 +92,6 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<EmployeePayItem>(e =>
         {
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.UserId);
         });
         b.Entity<PayrollRun>(e =>
@@ -101,17 +103,34 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<Payslip>(e =>
         {
             e.HasIndex(x => new { x.PayrollRunId, x.UserId }).IsUnique();
-            e.Property(x => x.EpfCategory).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.SocsoCategory).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.UserId);
             e.HasMany(x => x.Lines).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.Contributions).WithOne().HasForeignKey(x => x.PayslipId).OnDelete(DeleteBehavior.Cascade);
         });
         b.Entity<PayslipLine>(e =>
         {
             e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.Category).HasConversion<string>().HasMaxLength(20);
             e.HasIndex(x => x.RequestId);
+        });
+        b.Entity<ContributionScheme>(e =>
+        {
+            e.Property(x => x.Method).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Rounding).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Code).HasMaxLength(20);
+            e.Property(x => x.EmployeeRate).HasPrecision(9, 4);
+            e.Property(x => x.EmployerRate).HasPrecision(9, 4);
+            e.HasMany(x => x.Bands).WithOne().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<ContributionBand>(e =>
+        {
+            e.Property(x => x.Employee).HasPrecision(18, 4);
+            e.Property(x => x.Employer).HasPrecision(18, 4);
+        });
+        b.Entity<EmployeeContribution>(e =>
+        {
+            e.HasIndex(x => new { x.UserId, x.SchemeId }).IsUnique();
+            e.HasOne(x => x.Scheme).WithMany().HasForeignKey(x => x.SchemeId).OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

@@ -45,6 +45,7 @@ public static class DbSeeder
         var defaults = new (string, string)[]
         {
             ("CompanyName", "My Company"), ("WorkStartTime", "09:00"), ("WorkEndTime", "18:00"),
+            ("Currency", "MYR"), ("WorkDays", LeaveService.DefaultWorkDays),
         }.Concat(PayrollSettings.Defaults.Select(d => (PayrollSettings.Prefix + d.Key, d.Value)));
         foreach (var (key, value) in defaults)
         {

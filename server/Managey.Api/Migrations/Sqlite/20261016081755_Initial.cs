@@ -31,6 +31,31 @@ namespace Managey.Api.Migrations.Sqlite
                 });
 
             migrationBuilder.CreateTable(
+                name: "ContributionSchemes",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Code = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Method = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    EmployeeRate = table.Column<decimal>(type: "TEXT", precision: 9, scale: 4, nullable: false),
+                    EmployerRate = table.Column<decimal>(type: "TEXT", precision: 9, scale: 4, nullable: false),
+                    WageCeiling = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: true),
+                    Rounding = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    EffectiveFrom = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    DefaultForNewEmployees = table.Column<bool>(type: "INTEGER", nullable: false),
+                    MemberNoRequired = table.Column<bool>(type: "INTEGER", nullable: false),
+                    EmployerRef = table.Column<string>(type: "TEXT", nullable: true),
+                    SortOrder = table.Column<int>(type: "INTEGER", nullable: false),
+                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ContributionSchemes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Departments",
                 columns: table => new
                 {
@@ -41,6 +66,23 @@ namespace Managey.Api.Migrations.Sqlite
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Departments", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "EmployeePayItems",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Amount = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    Statutory = table.Column<bool>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EmployeePayItems", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -82,11 +124,31 @@ namespace Managey.Api.Migrations.Sqlite
                     Name = table.Column<string>(type: "TEXT", nullable: false),
                     DefaultDays = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
                     RequiresAttachment = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsUnpaid = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_LeaveTypes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PayrollRuns",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    Year = table.Column<int>(type: "INTEGER", nullable: false),
+                    Month = table.Column<int>(type: "INTEGER", nullable: false),
+                    Status = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
+                    CreatedById = table.Column<int>(type: "INTEGER", nullable: false),
+                    FinalizedAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    FinalizedById = table.Column<int>(type: "INTEGER", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayrollRuns", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -118,6 +180,29 @@ namespace Managey.Api.Migrations.Sqlite
                 });
 
             migrationBuilder.CreateTable(
+                name: "ContributionBands",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    SchemeId = table.Column<int>(type: "INTEGER", nullable: false),
+                    UpTo = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    Employee = table.Column<decimal>(type: "TEXT", precision: 18, scale: 4, nullable: false),
+                    Employer = table.Column<decimal>(type: "TEXT", precision: 18, scale: 4, nullable: false),
+                    Step = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ContributionBands", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ContributionBands_ContributionSchemes_SchemeId",
+                        column: x => x.SchemeId,
+                        principalTable: "ContributionSchemes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Users",
                 columns: table => new
                 {
@@ -136,7 +221,13 @@ namespace Managey.Api.Migrations.Sqlite
                     JoinDate = table.Column<DateTime>(type: "TEXT", nullable: true),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "TEXT", nullable: false),
-                    LastLoginAt = table.Column<DateTime>(type: "TEXT", nullable: true)
+                    LastLoginAt = table.Column<DateTime>(type: "TEXT", nullable: true),
+                    BasicSalary = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: true),
+                    IcNumber = table.Column<string>(type: "TEXT", nullable: true),
+                    PassportNo = table.Column<string>(type: "TEXT", nullable: true),
+                    TaxNo = table.Column<string>(type: "TEXT", nullable: true),
+                    BankName = table.Column<string>(type: "TEXT", nullable: true),
+                    BankAccountNo = table.Column<string>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -152,6 +243,42 @@ namespace Managey.Api.Migrations.Sqlite
                         column: x => x.ManagerId,
                         principalTable: "Users",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Payslips",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PayrollRunId = table.Column<int>(type: "INTEGER", nullable: false),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    EmployeeNo = table.Column<string>(type: "TEXT", nullable: false),
+                    EmployeeName = table.Column<string>(type: "TEXT", nullable: false),
+                    Department = table.Column<string>(type: "TEXT", nullable: true),
+                    Position = table.Column<string>(type: "TEXT", nullable: true),
+                    IcNumber = table.Column<string>(type: "TEXT", nullable: true),
+                    PassportNo = table.Column<string>(type: "TEXT", nullable: true),
+                    TaxNo = table.Column<string>(type: "TEXT", nullable: true),
+                    BankName = table.Column<string>(type: "TEXT", nullable: true),
+                    BankAccountNo = table.Column<string>(type: "TEXT", nullable: true),
+                    BasicSalary = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    GrossPay = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    StatutoryWage = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    StatutoryOverride = table.Column<bool>(type: "INTEGER", nullable: false),
+                    TotalDeductions = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    EmployerContributions = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    NetPay = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Payslips", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Payslips_PayrollRuns_PayrollRunId",
+                        column: x => x.PayrollRunId,
+                        principalTable: "PayrollRuns",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -171,6 +298,35 @@ namespace Managey.Api.Migrations.Sqlite
                     table.PrimaryKey("PK_Attendance", x => x.Id);
                     table.ForeignKey(
                         name: "FK_Attendance_Users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "Users",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "EmployeeContributions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    UserId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SchemeId = table.Column<int>(type: "INTEGER", nullable: false),
+                    MemberNo = table.Column<string>(type: "TEXT", nullable: true),
+                    EmployeeAmount = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: true),
+                    EmployerAmount = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_EmployeeContributions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_EmployeeContributions_ContributionSchemes_SchemeId",
+                        column: x => x.SchemeId,
+                        principalTable: "ContributionSchemes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_EmployeeContributions_Users_UserId",
                         column: x => x.UserId,
                         principalTable: "Users",
                         principalColumn: "Id",
@@ -211,6 +367,57 @@ namespace Managey.Api.Migrations.Sqlite
                         column: x => x.RequesterId,
                         principalTable: "Users",
                         principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PayslipContributions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PayslipId = table.Column<int>(type: "INTEGER", nullable: false),
+                    SchemeId = table.Column<int>(type: "INTEGER", nullable: true),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Code = table.Column<string>(type: "TEXT", nullable: false),
+                    MemberNo = table.Column<string>(type: "TEXT", nullable: true),
+                    Employee = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    Employer = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    SortOrder = table.Column<int>(type: "INTEGER", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayslipContributions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PayslipContributions_Payslips_PayslipId",
+                        column: x => x.PayslipId,
+                        principalTable: "Payslips",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PayslipLines",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "INTEGER", nullable: false)
+                        .Annotation("Sqlite:Autoincrement", true),
+                    PayslipId = table.Column<int>(type: "INTEGER", nullable: false),
+                    Kind = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    Name = table.Column<string>(type: "TEXT", nullable: false),
+                    Amount = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
+                    Statutory = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Source = table.Column<string>(type: "TEXT", maxLength: 20, nullable: false),
+                    RequestId = table.Column<int>(type: "INTEGER", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PayslipLines", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PayslipLines_Payslips_PayslipId",
+                        column: x => x.PayslipId,
+                        principalTable: "Payslips",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -306,6 +513,11 @@ namespace Managey.Api.Migrations.Sqlite
                 column: "Timestamp");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ContributionBands_SchemeId",
+                table: "ContributionBands",
+                column: "SchemeId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Departments_Name",
                 table: "Departments",
                 column: "Name",
@@ -320,6 +532,22 @@ namespace Managey.Api.Migrations.Sqlite
                 name: "IX_Documents_UploadedById",
                 table: "Documents",
                 column: "UploadedById");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EmployeeContributions_SchemeId",
+                table: "EmployeeContributions",
+                column: "SchemeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EmployeeContributions_UserId_SchemeId",
+                table: "EmployeeContributions",
+                columns: new[] { "UserId", "SchemeId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_EmployeePayItems_UserId",
+                table: "EmployeePayItems",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Holidays_Date",
@@ -338,6 +566,38 @@ namespace Managey.Api.Migrations.Sqlite
                 table: "LeaveTypes",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayrollRuns_Year_Month",
+                table: "PayrollRuns",
+                columns: new[] { "Year", "Month" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayslipContributions_PayslipId",
+                table: "PayslipContributions",
+                column: "PayslipId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayslipLines_PayslipId",
+                table: "PayslipLines",
+                column: "PayslipId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PayslipLines_RequestId",
+                table: "PayslipLines",
+                column: "RequestId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payslips_PayrollRunId_UserId",
+                table: "Payslips",
+                columns: new[] { "PayrollRunId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Payslips_UserId",
+                table: "Payslips",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Requests_LeaveTypeId",
@@ -391,13 +651,28 @@ namespace Managey.Api.Migrations.Sqlite
                 name: "AuditLogs");
 
             migrationBuilder.DropTable(
+                name: "ContributionBands");
+
+            migrationBuilder.DropTable(
                 name: "Documents");
+
+            migrationBuilder.DropTable(
+                name: "EmployeeContributions");
+
+            migrationBuilder.DropTable(
+                name: "EmployeePayItems");
 
             migrationBuilder.DropTable(
                 name: "Holidays");
 
             migrationBuilder.DropTable(
                 name: "LeaveEntitlements");
+
+            migrationBuilder.DropTable(
+                name: "PayslipContributions");
+
+            migrationBuilder.DropTable(
+                name: "PayslipLines");
 
             migrationBuilder.DropTable(
                 name: "Settings");
@@ -409,10 +684,19 @@ namespace Managey.Api.Migrations.Sqlite
                 name: "Requests");
 
             migrationBuilder.DropTable(
+                name: "ContributionSchemes");
+
+            migrationBuilder.DropTable(
+                name: "Payslips");
+
+            migrationBuilder.DropTable(
                 name: "LeaveTypes");
 
             migrationBuilder.DropTable(
                 name: "Users");
+
+            migrationBuilder.DropTable(
+                name: "PayrollRuns");
 
             migrationBuilder.DropTable(
                 name: "Departments");

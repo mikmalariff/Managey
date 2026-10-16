@@ -78,7 +78,8 @@ public class AuthController(AppDbContext db, IPasswordHasher<User> hasher, Audit
 
     private async Task<object?> MeAsync(int id)
     {
-        var company = await db.Settings.Where(s => s.Key == "CompanyName").Select(s => s.Value).FirstOrDefaultAsync();
+        var settings = await db.Settings.Where(s => s.Key == "CompanyName" || s.Key == "Currency" || s.Key == "WorkDays")
+            .ToDictionaryAsync(s => s.Key, s => s.Value);
         return await db.Users
             .Where(u => u.Id == id && u.IsActive)
             .Select(u => new
@@ -87,7 +88,9 @@ public class AuthController(AppDbContext db, IPasswordHasher<User> hasher, Audit
                 Department = u.Department!.Name,
                 u.Position,
                 IsManager = db.Users.Any(x => x.ManagerId == u.Id),
-                CompanyName = company,
+                CompanyName = settings.GetValueOrDefault("CompanyName"),
+                Currency = settings.GetValueOrDefault("Currency") ?? "MYR",
+                WorkDays = settings.GetValueOrDefault("WorkDays") ?? LeaveService.DefaultWorkDays,
             })
             .FirstOrDefaultAsync();
     }

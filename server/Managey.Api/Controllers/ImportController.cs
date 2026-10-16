@@ -19,7 +19,7 @@ namespace Managey.Api.Controllers;
 [Authorize(Roles = Roles.AdminOrHR)]
 public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, AuditService audit) : ControllerBase
 {
-    private static readonly (string Header, string Example, string Note)[] Columns =
+    private static readonly (string Header, string Example, string Note)[] BaseColumns =
     [
         ("Employee No", "E0101", "Required. Existing numbers are updated, new ones are created."),
         ("Full Name", "Aisyah Binti Kamal", "Required."),
@@ -31,26 +31,44 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         ("Role", "Staff", "Staff, Manager or HR (Admin only if you are an admin). Defaults to Staff."),
         ("Reports To", "E0002", "Employee No of their manager. Can be someone in this file."),
         ("Join Date", "2024-03-01", "yyyy-mm-dd or dd/mm/yyyy."),
-        ("Basic Salary", "3500", "Monthly, in RM."),
-        ("Monthly PCB", "45.50", "Monthly tax deduction (MTD), in RM."),
-        ("IC Number", "900101-14-5678", ""),
-        ("Passport No", "", "Foreign employees without an IC."),
+        ("Basic Salary", "3500", "Monthly, in your currency."),
+        ("ID Number", "900101-14-5678", "National ID (e.g. MyKad, NRIC). 'IC Number' is also accepted."),
+        ("Passport No", "", "Employees without a national ID."),
         ("Bank Name", "Maybank", ""),
         ("Bank Account No", "512345678901", "Format the column as Text so leading zeros are kept."),
-        ("EPF No", "12345678", ""),
-        ("SOCSO No", "900101145678", ""),
         ("Tax No", "SG12345678090", ""),
         ("Password", "", "Optional, new employees only. Leave blank to generate one."),
     ];
 
+    /// <summary>Other header names people commonly use for a column.</summary>
+    private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["IC Number"] = "ID Number", ["IC No"] = "ID Number", ["NRIC"] = "ID Number", ["MyKad"] = "ID Number",
+    };
+
+    /// <summary>Base columns plus "{Code} No" for every scheme and "{Code} Amount" for per-employee schemes.</summary>
+    private async Task<(List<(string Header, string Example, string Note)> Columns, List<ContributionScheme> Schemes)> ColumnsAsync()
+    {
+        var schemes = await db.ContributionSchemes.Where(s => s.IsActive).OrderBy(s => s.SortOrder).ToListAsync();
+        var columns = BaseColumns.ToList();
+        foreach (var s in schemes)
+        {
+            columns.Add(($"{s.Code} No", "", $"Member number for {s.Name}."));
+            if (s.Method == ContributionMethod.PerEmployee)
+                columns.Add(($"{s.Code} Amount", "", $"Monthly employee amount for {s.Name}."));
+        }
+        return (columns, schemes);
+    }
+
     public record ImportRow(int Row, string? EmployeeNo, string? FullName, string Action, List<string> Messages, string? TempPassword);
 
     [HttpGet("template")]
-    public IActionResult Template()
+    public async Task<IActionResult> Template()
     {
+        var (Columns, _) = await ColumnsAsync();
         using var book = new XLWorkbook();
         var sheet = book.AddWorksheet("Employees");
-        for (var i = 0; i < Columns.Length; i++)
+        for (var i = 0; i < Columns.Count; i++)
         {
             sheet.Cell(1, i + 1).Value = Columns[i].Header;
             sheet.Cell(2, i + 1).Value = Columns[i].Example;
@@ -63,12 +81,12 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         notes.Cell(1, 1).Value = "Column";
         notes.Cell(1, 2).Value = "Notes";
         notes.Row(1).Style.Font.Bold = true;
-        for (var i = 0; i < Columns.Length; i++)
+        for (var i = 0; i < Columns.Count; i++)
         {
             notes.Cell(i + 2, 1).Value = Columns[i].Header;
             notes.Cell(i + 2, 2).Value = Columns[i].Note;
         }
-        notes.Cell(Columns.Length + 3, 1).Value = "Delete the example row before importing.";
+        notes.Cell(Columns.Count + 3, 1).Value = "Delete the example row before importing.";
         notes.Columns().AdjustToContents();
 
         using var stream = new MemoryStream();
@@ -80,13 +98,15 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
     [RequestSizeLimit(10 * 1024 * 1024)]
     public async Task<IActionResult> Import([FromForm] IFormFile file, [FromQuery] bool commit = false)
     {
+        var (columns, schemes) = await ColumnsAsync();
+        var known = columns.Select(c => c.Header).ToList();
         List<Dictionary<string, string>> records;
         try
         {
             records = Path.GetExtension(file.FileName).ToLowerInvariant() switch
             {
-                ".xlsx" => ReadXlsx(file),
-                ".csv" => ReadCsv(file),
+                ".xlsx" => ReadXlsx(file, known),
+                ".csv" => ReadCsv(file, known),
                 _ => throw new FormatException("Upload an .xlsx or .csv file."),
             };
         }
@@ -103,7 +123,8 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         var fileEmpNos = records.Select(r => Get(r, "Employee No")).Where(x => x is not null).ToList();
 
         var results = new List<ImportRow>();
-        var plans = new List<(Dictionary<string, string> Record, User User, bool IsNew, string? Password, string? ManagerNo, string? Department)>();
+        var plans = new List<(Dictionary<string, string> Record, User User, bool IsNew, string? Password, string? ManagerNo, string? Department,
+            List<(ContributionScheme Scheme, string? MemberNo, decimal? Amount)> Memberships)>();
         var usernamesTaken = new HashSet<string>(existing.Select(u => u.Username), StringComparer.OrdinalIgnoreCase);
         var seenEmpNos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -150,7 +171,14 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
 
             var joinDate = ParseDate(Get(r, "Join Date"), messages);
             var basic = ParseMoney(Get(r, "Basic Salary"), "Basic Salary", messages);
-            var pcb = ParseMoney(Get(r, "Monthly PCB"), "Monthly PCB", messages);
+            var memberships = new List<(ContributionScheme, string?, decimal?)>();
+            foreach (var scheme in schemes)
+            {
+                var memberNo = Get(r, $"{scheme.Code} No");
+                var amount = scheme.Method == ContributionMethod.PerEmployee
+                    ? ParseMoney(Get(r, $"{scheme.Code} Amount"), $"{scheme.Code} Amount", messages) : null;
+                if (memberNo is not null || amount is not null) memberships.Add((scheme, memberNo, amount));
+            }
             var password = Get(r, "Password");
             if (password is not null && isNew && UsersController.PasswordProblem(password) is { } problem) messages.Add(problem);
 
@@ -167,15 +195,12 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
             if (Get(r, "Position") is { } position) user.Position = position;
             if (role is not null) user.Role = role.Value;
             if (joinDate is not null) user.JoinDate = joinDate;
-            UsersController.ApplyPay(user,
-                basic ?? user.BasicSalary, pcb ?? user.MonthlyPcb,
-                Get(r, "IC Number") ?? user.IcNumber, Get(r, "Bank Name") ?? user.BankName, Get(r, "Bank Account No") ?? user.BankAccountNo,
-                Get(r, "EPF No") ?? user.EpfNo, Get(r, "SOCSO No") ?? user.SocsoNo, Get(r, "Tax No") ?? user.TaxNo);
-
-            if (Get(r, "Passport No") is { } passport) user.PassportNo = passport;
+            UsersController.ApplyPay(user, basic ?? user.BasicSalary,
+                Get(r, "ID Number") ?? user.IcNumber, Get(r, "Passport No") ?? user.PassportNo, Get(r, "Tax No") ?? user.TaxNo,
+                Get(r, "Bank Name") ?? user.BankName, Get(r, "Bank Account No") ?? user.BankAccountNo);
 
             var tempPassword = isNew && password is null ? GeneratePassword() : null;
-            plans.Add((r, user, isNew, password ?? tempPassword, managerNo, Get(r, "Department")));
+            plans.Add((r, user, isNew, password ?? tempPassword, managerNo, Get(r, "Department"), memberships));
             results.Add(new ImportRow(rowNo, empNo, name, isNew ? "Create" : "Update", [], commit ? tempPassword : null));
         }
 
@@ -213,6 +238,22 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         foreach (var plan in plans.Where(p => p.ManagerNo is not null))
             plan.User.ManagerId = byEmpNo[plan.ManagerNo!].Id;
 
+        await UsersController.EnrolInDefaultSchemesAsync(db, plans.Where(p => p.IsNew).Select(p => p.User.Id).ToList());
+        var planUserIds = plans.Select(p => p.User.Id).ToList();
+        var current = await db.EmployeeContributions.Where(c => planUserIds.Contains(c.UserId)).ToListAsync();
+        foreach (var plan in plans)
+            foreach (var (scheme, memberNo, amount) in plan.Memberships)
+            {
+                var row = current.FirstOrDefault(c => c.UserId == plan.User.Id && c.SchemeId == scheme.Id);
+                if (row is null)
+                {
+                    row = new EmployeeContribution { UserId = plan.User.Id, SchemeId = scheme.Id };
+                    db.EmployeeContributions.Add(row);
+                }
+                if (memberNo is not null) row.MemberNo = memberNo;
+                if (amount is not null) row.EmployeeAmount = amount;
+            }
+
         audit.Log("Import", nameof(User), null, $"{results.Count(r => r.Action == "Create")} created, {results.Count(r => r.Action == "Update")} updated from {file.FileName}");
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -237,7 +278,8 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
     private static decimal? ParseMoney(string? text, string column, List<string> messages)
     {
         if (text is null) return null;
-        var cleaned = text.Replace("RM", "", StringComparison.OrdinalIgnoreCase).Replace(",", "").Trim();
+        // Drop thousands separators and currency symbols/codes (RM, $, S$...).
+        var cleaned = System.Text.RegularExpressions.Regex.Replace(text.Replace(",", ""), @"[^0-9.\-]", "");
         if (decimal.TryParse(cleaned, NumberStyles.Number, CultureInfo.InvariantCulture, out var v) && v >= 0) return v;
         messages.Add($"{column} '{text}' is not a valid amount.");
         return null;
@@ -249,13 +291,13 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         return new string(Enumerable.Range(0, 10).Select(_ => chars[RandomNumberGenerator.GetInt32(chars.Length)]).ToArray());
     }
 
-    private static Dictionary<string, string> MapHeaders(IReadOnlyList<string> headers, IReadOnlyList<string> values)
+    private static Dictionary<string, string> MapHeaders(IReadOnlyList<string> headers, IReadOnlyList<string> values, List<string> known)
     {
-        var known = Columns.Select(c => c.Header).ToList();
         var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < headers.Count && i < values.Count; i++)
         {
-            var header = known.FirstOrDefault(k => string.Equals(Normalize(k), Normalize(headers[i]), StringComparison.OrdinalIgnoreCase));
+            var name = Aliases.TryGetValue(headers[i].Trim(), out var alias) ? alias : headers[i];
+            var header = known.FirstOrDefault(k => string.Equals(Normalize(k), Normalize(name), StringComparison.OrdinalIgnoreCase));
             if (header is not null) row[header] = values[i];
         }
         return row;
@@ -263,14 +305,14 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
         static string Normalize(string s) => new(s.Where(char.IsLetterOrDigit).ToArray());
     }
 
-    private static void RequireHeaders(IReadOnlyList<string> headers)
+    private static void RequireHeaders(IReadOnlyList<string> headers, List<string> known)
     {
-        var mapped = MapHeaders(headers, headers);
+        var mapped = MapHeaders(headers, headers, known);
         if (!mapped.ContainsKey("Employee No") || !mapped.ContainsKey("Full Name"))
             throw new FormatException("The first row must contain the column headers, including 'Employee No' and 'Full Name'. Download the template to see the layout.");
     }
 
-    private static List<Dictionary<string, string>> ReadXlsx(IFormFile file)
+    private static List<Dictionary<string, string>> ReadXlsx(IFormFile file, List<string> known)
     {
         using var stream = file.OpenReadStream();
         using var book = new XLWorkbook(stream);
@@ -280,7 +322,7 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
 
         var lastCol = used.LastColumn().ColumnNumber();
         var headers = Enumerable.Range(1, lastCol).Select(c => sheet.Cell(1, c).GetString()).ToList();
-        RequireHeaders(headers);
+        RequireHeaders(headers, known);
 
         var rows = new List<Dictionary<string, string>>();
         for (var r = 2; r <= used.LastRow().RowNumber(); r++)
@@ -291,18 +333,18 @@ public class ImportController(AppDbContext db, IPasswordHasher<User> hasher, Aud
                 return cell.DataType == XLDataType.DateTime ? cell.GetDateTime().ToString("yyyy-MM-dd") : cell.GetFormattedString();
             }).ToList();
             if (values.All(string.IsNullOrWhiteSpace)) continue;
-            rows.Add(MapHeaders(headers, values));
+            rows.Add(MapHeaders(headers, values, known));
         }
         return rows;
     }
 
-    private static List<Dictionary<string, string>> ReadCsv(IFormFile file)
+    private static List<Dictionary<string, string>> ReadCsv(IFormFile file, List<string> known)
     {
         using var reader = new StreamReader(file.OpenReadStream());
         var lines = ParseCsv(reader.ReadToEnd());
         if (lines.Count == 0) return [];
-        RequireHeaders(lines[0]);
-        return lines.Skip(1).Where(l => l.Any(v => !string.IsNullOrWhiteSpace(v))).Select(l => MapHeaders(lines[0], l)).ToList();
+        RequireHeaders(lines[0], known);
+        return lines.Skip(1).Where(l => l.Any(v => !string.IsNullOrWhiteSpace(v))).Select(l => MapHeaders(lines[0], l, known)).ToList();
     }
 
     /// <summary>RFC 4180 CSV: quoted fields, escaped quotes, newlines inside quotes.</summary>

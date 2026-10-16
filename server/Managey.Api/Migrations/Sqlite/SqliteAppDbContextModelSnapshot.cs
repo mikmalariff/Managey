@@ -127,6 +127,98 @@ namespace Managey.Api.Migrations.Sqlite
                     b.ToTable("AuditLogs");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionBand", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Employee")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Employer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SchemeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Step")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("UpTo")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchemeId");
+
+                    b.ToTable("ContributionBands");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.ContributionScheme", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("DefaultForNewEmployees")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("EffectiveFrom")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EmployeeRate")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EmployerRate")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("EmployerRef")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("MemberNoRequired")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Rounding")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("WageCeiling")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ContributionSchemes");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Department", b =>
                 {
                     b.Property<int>("Id")
@@ -187,6 +279,39 @@ namespace Managey.Api.Migrations.Sqlite
                     b.ToTable("Documents");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.EmployeeContribution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("EmployeeAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("EmployerAmount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MemberNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SchemeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SchemeId");
+
+                    b.HasIndex("UserId", "SchemeId")
+                        .IsUnique();
+
+                    b.ToTable("EmployeeContributions");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.EmployeePayItem", b =>
                 {
                     b.Property<int>("Id")
@@ -195,11 +320,6 @@ namespace Managey.Api.Migrations.Sqlite
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
@@ -359,17 +479,6 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<string>("Department")
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("EisEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EisEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("EisEnabled")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("EmployeeName")
                         .IsRequired()
                         .HasColumnType("TEXT");
@@ -378,20 +487,8 @@ namespace Managey.Api.Migrations.Sqlite
                         .IsRequired()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("EpfCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EpfEmployee")
+                    b.Property<decimal>("EmployerContributions")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("EpfEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("EpfNo")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("GrossPay")
@@ -411,34 +508,7 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<int>("PayrollRunId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal>("Pcb")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Position")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("SkbbkEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("SkbbkEnabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("SocsoCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("SocsoEmployee")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("SocsoEmployer")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SocsoNo")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("StatutoryOverride")
@@ -468,6 +538,47 @@ namespace Managey.Api.Migrations.Sqlite
                     b.ToTable("Payslips");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.PayslipContribution", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Employee")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Employer")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MemberNo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PayslipId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("SchemeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PayslipId");
+
+                    b.ToTable("PayslipContributions");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
                 {
                     b.Property<int>("Id")
@@ -476,11 +587,6 @@ namespace Managey.Api.Migrations.Sqlite
 
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Kind")
@@ -618,22 +724,11 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<int?>("DepartmentId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<bool>("EisEnabled")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("Email")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("EmployeeNo")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("EpfCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("EpfNo")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("FullName")
@@ -655,10 +750,6 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<int?>("ManagerId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal?>("MonthlyPcb")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("PassportNo")
                         .HasColumnType("TEXT");
 
@@ -675,17 +766,6 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Property<string>("Role")
                         .IsRequired()
                         .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("SkbbkEnabled")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("SocsoCategory")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("SocsoNo")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("TaxNo")
@@ -773,6 +853,15 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionBand", b =>
+                {
+                    b.HasOne("Managey.Api.Data.ContributionScheme", null)
+                        .WithMany("Bands")
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Document", b =>
                 {
                     b.HasOne("Managey.Api.Data.Request", "Request")
@@ -791,6 +880,23 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("UploadedBy");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.EmployeeContribution", b =>
+                {
+                    b.HasOne("Managey.Api.Data.ContributionScheme", "Scheme")
+                        .WithMany()
+                        .HasForeignKey("SchemeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Managey.Api.Data.User", null)
+                        .WithMany("Contributions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Scheme");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
                 {
                     b.HasOne("Managey.Api.Data.PayrollRun", "PayrollRun")
@@ -800,6 +906,15 @@ namespace Managey.Api.Migrations.Sqlite
                         .IsRequired();
 
                     b.Navigation("PayrollRun");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.PayslipContribution", b =>
+                {
+                    b.HasOne("Managey.Api.Data.Payslip", null)
+                        .WithMany("Contributions")
+                        .HasForeignKey("PayslipId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Managey.Api.Data.PayslipLine", b =>
@@ -845,6 +960,11 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("Manager");
                 });
 
+            modelBuilder.Entity("Managey.Api.Data.ContributionScheme", b =>
+                {
+                    b.Navigation("Bands");
+                });
+
             modelBuilder.Entity("Managey.Api.Data.PayrollRun", b =>
                 {
                     b.Navigation("Payslips");
@@ -852,6 +972,8 @@ namespace Managey.Api.Migrations.Sqlite
 
             modelBuilder.Entity("Managey.Api.Data.Payslip", b =>
                 {
+                    b.Navigation("Contributions");
+
                     b.Navigation("Lines");
                 });
 
@@ -860,6 +982,11 @@ namespace Managey.Api.Migrations.Sqlite
                     b.Navigation("Attachments");
 
                     b.Navigation("Steps");
+                });
+
+            modelBuilder.Entity("Managey.Api.Data.User", b =>
+                {
+                    b.Navigation("Contributions");
                 });
 #pragma warning restore 612, 618
         }

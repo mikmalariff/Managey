@@ -1,5 +1,3 @@
-using Managey.Api.Data;
-
 namespace Managey.Api.Services;
 
 /// <summary>
@@ -12,8 +10,6 @@ namespace Managey.Api.Services;
 public static class PerkesoTables
 {
     public record Band(decimal UpTo, decimal SocsoEmployer, decimal SocsoEmployee, decimal SkbbkEmployee, decimal SocsoEmployerCategory2, decimal Eis);
-
-    public record Contributions(decimal SocsoEmployer, decimal SocsoEmployee, decimal EisEmployer, decimal EisEmployee, decimal SkbbkEmployee);
 
     public static readonly Band[] Bands =
     [
@@ -82,25 +78,4 @@ public static class PerkesoTables
         new(5900m, 102.35m, 29.25m, 43.85m, 73.10m, 11.70m),
         new(6000m, 104.15m, 29.75m, 44.65m, 74.40m, 11.90m),
     ];
-
-    public static Band? Find(decimal wage) =>
-        wage <= 0 ? null : Bands.FirstOrDefault(b => wage <= b.UpTo) ?? Bands[^1];
-
-    /// <param name="category">SOCSO First Category (employment injury + invalidity), Second (employment injury only, e.g. aged 60+), or None.</param>
-    public static Contributions Calculate(decimal wage, SocsoCategory category, bool eis, bool skbbk)
-    {
-        if (Find(wage) is not { } band) return new(0, 0, 0, 0, 0);
-        var socsoEmployer = category switch
-        {
-            SocsoCategory.First => band.SocsoEmployer,
-            SocsoCategory.Second => band.SocsoEmployerCategory2,
-            _ => 0,
-        };
-        return new(
-            socsoEmployer,
-            category == SocsoCategory.First ? band.SocsoEmployee : 0,
-            eis ? band.Eis : 0,
-            eis ? band.Eis : 0,
-            skbbk && category != SocsoCategory.None ? band.SkbbkEmployee : 0);
-    }
 }
