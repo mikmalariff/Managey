@@ -7,3 +7,6 @@ dist/
 *.db-wal
 .vs/
 *.user
+server/Managey.Api/wwwroot/
+server/Managey.Api/data/
+publish/
