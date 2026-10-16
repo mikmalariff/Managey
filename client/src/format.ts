@@ -34,3 +34,19 @@ export const approverLabel: Record<string, string> = {
   Admin: 'Admin',
   SpecificUser: 'Specific person',
 }
+
+/** Earnings and deductions grouped the way they are reported on the EA form. */
+export const earningCategories: { value: string; label: string }[] = [
+  { value: 'Allowance', label: 'Allowance (taxable)' },
+  { value: 'Salary', label: 'Salary / overtime' },
+  { value: 'Bonus', label: 'Bonus / commission' },
+  { value: 'Exempt', label: 'Tax-exempt' },
+  { value: 'Reimbursement', label: 'Reimbursement' },
+]
+
+export const deductionCategories: { value: string; label: string }[] = [
+  { value: 'Other', label: 'Other deduction' },
+  { value: 'Zakat', label: 'Zakat' },
+  { value: 'Cp38', label: 'CP38' },
+  { value: 'Salary', label: 'Reduces salary (e.g. unpaid leave)' },
+]

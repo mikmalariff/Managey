@@ -177,7 +177,11 @@ export const api = {
 export type PayItemKind = 'Earning' | 'Deduction'
 export type PayLineSource = 'Manual' | 'Recurring' | 'Claim' | 'UnpaidLeave'
 
-export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean }
+export type PayCategory = 'Salary' | 'Bonus' | 'Allowance' | 'Exempt' | 'Reimbursement' | 'Zakat' | 'Cp38' | 'Other'
+export type EpfCategory = 'Standard' | 'Age60Plus' | 'Foreign' | 'None'
+export type SocsoCategory = 'First' | 'Second' | 'None'
+
+export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean; category: PayCategory }
 
 export interface PayDetails {
   basicSalary: number | null
@@ -188,6 +192,11 @@ export interface PayDetails {
   epfNo: string | null
   socsoNo: string | null
   taxNo: string | null
+  passportNo: string | null
+  epfCategory: EpfCategory
+  socsoCategory: SocsoCategory
+  eisEnabled: boolean
+  skbbkEnabled: boolean
   items: PayItem[]
 }
 
@@ -232,6 +241,10 @@ export interface PayslipDetail {
   socsoEmployer: number
   eisEmployee: number
   eisEmployer: number
+  skbbkEmployee: number
+  passportNo: string | null
+  epfCategory: EpfCategory
+  socsoCategory: SocsoCategory
   pcb: number
   totalDeductions: number
   netPay: number

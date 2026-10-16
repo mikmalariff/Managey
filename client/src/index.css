@@ -262,6 +262,10 @@ input[type='file'] { padding: 5px; }
 .status-draft { color: var(--primary); }
 .status-finalised::before { background: currentColor; }
 
+/* ---------- Notice ---------- */
+
+.notice { border: 1px solid var(--primary); border-left-width: 3px; background: var(--accent-soft); border-radius: var(--radius); padding: 12px 16px; display: flex; flex-direction: column; gap: 4px; }
+
 /* ---------- Import steps ---------- */
 
 .steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
@@ -285,12 +289,48 @@ input[type='file'] { padding: 5px; }
 .payslip-employer { display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px; font-size: 13px; }
 .payslip-foot { margin-top: 24px; font-size: 12px; }
 
+/* ---------- EA form ---------- */
+
+.ea { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; max-width: 860px; font-size: 13px; }
+.ea-head { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid var(--primary); }
+.ea-meta { display: flex; gap: 24px; flex-wrap: wrap; justify-content: flex-end; }
+.ea-meta span, .ea-foot span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.ea-title { display: flex; gap: 16px; align-items: center; }
+.ea-code { font-size: 32px; font-weight: 700; color: var(--primary); border: 2px solid var(--primary); border-radius: 6px; padding: 2px 12px; }
+.ea-note { font-size: 11px; color: var(--muted); }
+.ea-section { margin: 16px 0 8px; font-size: 12px; letter-spacing: 0.03em; }
+.ea-details { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin: 0; }
+.ea-details dt { color: var(--muted); }
+.ea-details dd { margin: 0 0 4px; }
+.ea-table { margin-top: 12px; }
+.ea-table tr { break-inside: avoid; }
+.ea-table th { background: none; color: var(--text); font-weight: 600; font-size: 12px; border-bottom: 1px solid var(--border-strong); padding: 14px 0 6px; white-space: normal; }
+.ea-table td { padding: 5px 0; border-bottom: 1px dotted var(--border); }
+.ea-no { width: 48px; color: var(--muted); }
+.ea-total td { font-weight: 600; border-top: 1px solid var(--border-strong); }
+.ea-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--border-strong); }
+.page-break { break-after: page; height: 0; }
+
+@page { size: A4; margin: 10mm; }
+
 @media print {
   body { background: #fff; color: #000; }
   .sidebar, .no-print { display: none !important; }
   .shell { display: block; }
-  .main { padding: 0; max-width: none; }
-  .payslip { border: 0; padding: 0; max-width: none; }
+  .shell .main { padding: 0; max-width: none; }
+  .payslip, .ea { border: 0; padding: 0; max-width: none; }
+  .stack:has(> .page-break) { gap: 0; }
+  /* One EA per A4 page. */
+  .ea { font-size: 10.5px; }
+  .ea-head { gap: 6px; }
+  .ea-code { font-size: 24px; }
+  .ea-section { margin: 8px 0 4px; }
+  .ea-details { gap: 2px 24px; }
+  .ea-details dd { margin: 0; }
+  .ea-table th { padding: 8px 0 3px; font-size: 10.5px; }
+  .ea-table td { padding: 1.5px 0; }
+  .ea .mono { font-size: inherit; }
+  .ea-foot { margin-top: 10px; gap: 2px 24px; grid-template-columns: 1fr 1fr 1fr; }
   .payslip-net { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* A4 is narrower than the mobile breakpoint; keep the desktop layout on paper. */
   .payslip .payslip-info { grid-template-columns: repeat(3, 1fr); }

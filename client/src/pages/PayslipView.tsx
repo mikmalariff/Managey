@@ -34,7 +34,7 @@ export default function PayslipView() {
         <dl className="payslip-info">
           <div><dt>Name</dt><dd>{p.employeeName}</dd></div>
           <div><dt>Employee no.</dt><dd>{p.employeeNo}</dd></div>
-          <div><dt>IC no.</dt><dd>{p.icNumber ?? '—'}</dd></div>
+          <div><dt>{p.icNumber || !p.passportNo ? 'IC no.' : 'Passport no.'}</dt><dd>{p.icNumber ?? p.passportNo ?? '—'}</dd></div>
           <div><dt>Department</dt><dd>{p.department ?? '—'}</dd></div>
           <div><dt>Position</dt><dd>{p.position ?? '—'}</dd></div>
           <div><dt>EPF no.</dt><dd>{p.epfNo ?? '—'}</dd></div>
@@ -59,6 +59,7 @@ export default function PayslipView() {
               <tr><td>EPF (employee)</td><td className="right mono">{amount(p.epfEmployee)}</td></tr>
               <tr><td>SOCSO (employee)</td><td className="right mono">{amount(p.socsoEmployee)}</td></tr>
               <tr><td>EIS (employee)</td><td className="right mono">{amount(p.eisEmployee)}</td></tr>
+              {p.skbbkEmployee > 0 && <tr><td>LINDUNG 24 Jam (SKBBK)</td><td className="right mono">{amount(p.skbbkEmployee)}</td></tr>}
               <tr><td>PCB / MTD</td><td className="right mono">{amount(p.pcb)}</td></tr>
             </tbody>
             <tfoot><tr><td>Total deductions</td><td className="right mono">{amount(p.totalDeductions)}</td></tr></tfoot>

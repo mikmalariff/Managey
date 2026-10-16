@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { api, type PayItemKind, type PayslipDetail, type PayslipLine } from '../api'
+import { api, type PayCategory, type PayItemKind, type PayslipDetail, type PayslipLine } from '../api'
 import { ErrorText, Field, Loading, Modal, PageHeader, useFetch } from '../components/ui'
-import { amount, monthName } from '../format'
+import { amount, deductionCategories, earningCategories, monthName } from '../format'
 
 interface RunDetail {
   id: number
@@ -22,8 +22,11 @@ interface RunDetail {
     epfEmployer: number
     socsoEmployee: number
     eisEmployee: number
+    skbbkEmployee: number
     pcb: number
     missingBank: boolean
+    missingIc: boolean
+    missingEpfNo: boolean
   }[]
   totals: { grossPay: number; netPay: number; epf: number; socso: number; eis: number; pcb: number; employerCost: number }
 }
@@ -38,6 +41,25 @@ export default function PayrollRun() {
   if (error) return <p className="error">{error}</p>
   if (!run) return <Loading />
   const draft = run.status === 'Draft'
+  const missingIc = run.payslips.filter(p => p.missingIc).map(p => p.employeeName)
+  const missingEpf = run.payslips.filter(p => p.missingEpfNo).map(p => p.employeeName)
+  const contributionMonth = monthName(run.month === 12 ? run.year + 1 : run.year, run.month === 12 ? 1 : run.month + 1)
+
+  /** Fetch first so a server error (e.g. missing employer code) shows here instead of as a JSON page. */
+  const download = async (file: string) => {
+    setActionError(null)
+    const res = await fetch(`/api/payroll/runs/${run.id}/${file}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => null)
+      setActionError(body?.message ?? `Download failed (${res.status}).`)
+      return
+    }
+    const name = /filename=([^;]+)/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? file
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(await res.blob())
+    link.download = name.replace(/"/g, '')
+    link.click()
+  }
 
   const act = async (message: string, action: () => Promise<unknown>, after?: () => void) => {
     if (!confirm(message)) return
@@ -57,8 +79,10 @@ export default function PayrollRun() {
         title={`Payroll · ${monthName(run.year, run.month)}`}
         subtitle={draft ? 'Draft: check and adjust each payslip, then finalise.' : 'Finalised. Staff can see their payslips.'}
         actions={<>
-          <a className="button" href={`/api/payroll/runs/${run.id}/export.xlsx`}>Excel</a>
-          <a className="button" href={`/api/payroll/runs/${run.id}/bank.csv`}>Bank file</a>
+          <button onClick={() => download('export.xlsx')}>Excel</button>
+          <button onClick={() => download('bank.csv')}>Bank file</button>
+          <button onClick={() => download('kwsp.csv')} title={`Upload in i-Akaun as contribution month ${contributionMonth}`}>KWSP file</button>
+          <button onClick={() => download('perkeso.txt')} title="Upload in PERKESO ASSIST">PERKESO file</button>
           {draft && <>
             <button onClick={() => act('Rebuild all payslips from current salaries, claims and leave? Manual changes will be lost.',
               () => api.post(`/api/payroll/runs/${run.id}/regenerate`))}>Rebuild</button>
@@ -70,11 +94,18 @@ export default function PayrollRun() {
         </>}
       />
       <ErrorText error={actionError} />
+      {(missingIc.length > 0 || missingEpf.length > 0) && (
+        <div className="notice">
+          {missingIc.length > 0 && <p>No IC, passport or SOCSO no. for {missingIc.join(', ')}. PERKESO will reject these rows.</p>}
+          {missingEpf.length > 0 && <p>No EPF member no. for {missingEpf.join(', ')}.</p>}
+          <p className="muted">Add them under People → Pay details, then rebuild this payroll.</p>
+        </div>
+      )}
 
       <div className="stats">
         <div className="stat"><div className="label">Net pay</div><div className="value">{amount(run.totals.netPay)}</div><div className="sub">to bank</div></div>
         <div className="stat"><div className="label">EPF</div><div className="value">{amount(run.totals.epf)}</div><div className="sub">employee + employer</div></div>
-        <div className="stat"><div className="label">SOCSO + EIS</div><div className="value">{amount(run.totals.socso + run.totals.eis)}</div><div className="sub">employee + employer</div></div>
+        <div className="stat"><div className="label">PERKESO</div><div className="value">{amount(run.totals.socso + run.totals.eis)}</div><div className="sub">SOCSO + EIS + SKBBK</div></div>
         <div className="stat"><div className="label">PCB</div><div className="value">{amount(run.totals.pcb)}</div><div className="sub">to LHDN</div></div>
         <div className="stat highlight"><div className="label">Total cost</div><div className="value">{amount(run.totals.employerCost)}</div><div className="sub">gross + employer share</div></div>
       </div>
@@ -88,6 +119,7 @@ export default function PayrollRun() {
               <th className="right">EPF</th>
               <th className="right">SOCSO</th>
               <th className="right">EIS</th>
+              <th className="right" title="LINDUNG 24 Jam">SKBBK</th>
               <th className="right">PCB</th>
               <th className="right">Deductions</th>
               <th className="right">Net pay</th>
@@ -105,6 +137,7 @@ export default function PayrollRun() {
                 <td className="right mono">{amount(p.epfEmployee)}</td>
                 <td className="right mono">{amount(p.socsoEmployee)}</td>
                 <td className="right mono">{amount(p.eisEmployee)}</td>
+                <td className="right mono">{amount(p.skbbkEmployee)}</td>
                 <td className="right mono">{amount(p.pcb)}</td>
                 <td className="right mono">{amount(p.totalDeductions)}</td>
                 <td className="right mono"><strong>{amount(p.netPay)}</strong></td>
@@ -118,8 +151,8 @@ export default function PayrollRun() {
         </table>
       </div>
       <p className="faint" style={{ fontSize: 12 }}>
-        EPF, SOCSO and EIS are calculated from the rates under Setup → Payroll. Check them against the official contribution
-        tables, and edit a payslip to enter exact amounts where needed.
+        SOCSO, EIS and SKBBK follow PERKESO's official contribution tables; EPF uses the KWSP wage bands and the rates under
+        Setup → Payroll. Upload the KWSP file in i-Akaun as contribution month {contributionMonth}, and the PERKESO file in ASSIST.
       </p>
 
       {editing !== null && <EditPayslip id={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload() }} />}
@@ -139,7 +172,7 @@ function EditPayslip({ id, onClose, onSaved }: { id: number; onClose: () => void
   const setLine = (i: number, patch: Partial<PayslipLine>) =>
     setForm({ ...form, lines: form.lines.map((l, j) => (j === i ? { ...l, ...patch } : l)) })
   const addLine = (kind: PayItemKind) =>
-    setForm({ ...form, lines: [...form.lines, { kind, name: '', amount: 0, statutory: kind === 'Earning', source: 'Manual', requestId: null }] })
+    setForm({ ...form, lines: [...form.lines, { kind, name: '', amount: 0, statutory: kind === 'Earning', category: kind === 'Earning' ? 'Allowance' : 'Other', source: 'Manual', requestId: null }] })
   const num = (v: string) => (v === '' ? 0 : Number(v))
 
   const save = async () => {
@@ -158,6 +191,7 @@ function EditPayslip({ id, onClose, onSaved }: { id: number; onClose: () => void
     ['epfEmployee', 'EPF employee'], ['epfEmployer', 'EPF employer'],
     ['socsoEmployee', 'SOCSO employee'], ['socsoEmployer', 'SOCSO employer'],
     ['eisEmployee', 'EIS employee'], ['eisEmployer', 'EIS employer'],
+    ['skbbkEmployee', 'SKBBK employee'],
   ]
 
   return (
@@ -181,7 +215,10 @@ function EditPayslip({ id, onClose, onSaved }: { id: number; onClose: () => void
             {form.lines.map((l, i) => l.kind === kind && (
               <div className="row" key={i} style={{ flexWrap: 'nowrap' }}>
                 <input value={l.name} placeholder={kind === 'Earning' ? 'e.g. Overtime' : 'e.g. Salary advance'} onChange={e => setLine(i, { name: e.target.value })} />
-                <input type="number" min="0" step="0.01" value={l.amount} onChange={e => setLine(i, { amount: num(e.target.value) })} style={{ width: 110 }} />
+                <input type="number" min="0" step="0.01" value={l.amount} onChange={e => setLine(i, { amount: num(e.target.value) })} style={{ width: 100 }} />
+                <select value={l.category} onChange={e => setLine(i, { category: e.target.value as PayCategory })} style={{ width: 140 }} title="How it appears on the EA form">
+                  {(kind === 'Earning' ? earningCategories : deductionCategories).map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                </select>
                 <label className="check muted nowrap" title="Counts as wages for EPF, SOCSO and EIS">
                   <input type="checkbox" checked={l.statutory} onChange={e => setLine(i, { statutory: e.target.checked })} /> EPF
                 </label>
@@ -193,7 +230,7 @@ function EditPayslip({ id, onClose, onSaved }: { id: number; onClose: () => void
 
         <label className="check">
           <input type="checkbox" checked={form.statutoryOverride} onChange={e => setForm({ ...form, statutoryOverride: e.target.checked })} />
-          Enter EPF, SOCSO and EIS manually
+          Enter EPF, SOCSO, EIS and SKBBK manually
         </label>
         {form.statutoryOverride && (
           <div className="grid-2">

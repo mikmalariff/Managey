@@ -1,4 +1,5 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { useMe } from '../auth'
 import { Empty, ErrorText, Loading, PageHeader, useFetch } from '../components/ui'
 import { amount, monthName } from '../format'
 
@@ -6,7 +7,9 @@ interface MyPayslip { id: number; year: number; month: number; grossPay: number;
 
 export default function Payslips() {
   const navigate = useNavigate()
+  const { me } = useMe()
   const { data, error } = useFetch<MyPayslip[]>('/api/payslips/mine')
+  const { data: eaYears } = useFetch<number[]>('/api/ea/mine')
 
   return (
     <div className="stack">
@@ -28,6 +31,15 @@ export default function Payslips() {
             </tbody>
           </table>
         </div>
+      )}
+      {eaYears && eaYears.length > 0 && (
+        <section>
+          <h2 style={{ marginBottom: 8 }}>EA forms</h2>
+          <p className="muted" style={{ marginBottom: 12 }}>Your yearly statement of remuneration (Borang EA), for filing your income tax.</p>
+          <div className="row">
+            {eaYears.map(y => <Link key={y} className="button" to={`/ea/${y}/${me.id}`}>EA {y}</Link>)}
+          </div>
+        </section>
       )}
     </div>
   )

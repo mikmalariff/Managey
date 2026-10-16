@@ -234,6 +234,16 @@ function Workflows() {
   )
 }
 
+const employerFields: { key: string; label: string; hint?: string; placeholder?: string }[] = [
+  { key: 'CompanyRegNo', label: 'SSM registration no.', placeholder: '201901012345' },
+  { key: 'CompanyPhone', label: 'Phone' },
+  { key: 'EmployerEpfNo', label: 'KWSP employer no.' },
+  { key: 'EmployerSocsoCode', label: 'PERKESO employer code', placeholder: 'E1300001111G', hint: '12 characters, as shown in ASSIST' },
+  { key: 'EmployerTaxNo', label: 'LHDN employer no. (E)', placeholder: 'E 1234567-08' },
+  { key: 'EaSignatoryName', label: 'EA form signed by', hint: 'Officer who certifies the EA form' },
+  { key: 'EaSignatoryPosition', label: 'Signatory position' },
+]
+
 function Company() {
   const { data } = useFetch<Record<string, string>>('/api/settings')
   const [form, setForm] = useState<Record<string, string>>({})
@@ -264,6 +274,19 @@ function Company() {
           <input type="time" value={form.WorkEndTime ?? ''} onChange={e => setForm({ ...form, WorkEndTime: e.target.value })} />
         </Field>
       </div>
+
+      <h2 style={{ marginTop: 8 }}>Employer details</h2>
+      <p className="muted">Used on the KWSP and PERKESO upload files and on EA forms.</p>
+      <div className="grid-2">
+        {employerFields.map(f => (
+          <Field key={f.key} label={f.label} hint={f.hint}>
+            <input value={form[f.key] ?? ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder} />
+          </Field>
+        ))}
+      </div>
+      <Field label="Address">
+        <textarea value={form.CompanyAddress ?? ''} onChange={e => setForm({ ...form, CompanyAddress: e.target.value })} style={{ minHeight: 60 }} />
+      </Field>
       <ErrorText error={error} />
       <div className="form-actions">
         <button className="primary" onClick={save}>Save</button>
@@ -436,12 +459,12 @@ const rateFields: { key: string; label: string; hint?: string }[] = [
   { key: 'EpfEmployerLow', label: 'EPF employer, wages up to threshold (%)' },
   { key: 'EpfEmployerHigh', label: 'EPF employer, wages above threshold (%)' },
   { key: 'EpfEmployerThreshold', label: 'EPF employer threshold (RM)' },
-  { key: 'SocsoEmployee', label: 'SOCSO employee (%)' },
-  { key: 'SocsoEmployer', label: 'SOCSO employer (%)' },
-  { key: 'EisEmployee', label: 'EIS employee (%)' },
-  { key: 'EisEmployer', label: 'EIS employer (%)' },
-  { key: 'SocsoEisCeiling', label: 'SOCSO & EIS wage ceiling (RM)' },
+  { key: 'EpfEmployee60', label: 'EPF employee, aged 60+ (%)' },
+  { key: 'EpfEmployer60', label: 'EPF employer, aged 60+ (%)' },
+  { key: 'EpfForeignEmployee', label: 'EPF employee, foreign worker (%)' },
+  { key: 'EpfForeignEmployer', label: 'EPF employer, foreign worker (%)' },
   { key: 'DaysPerMonth', label: 'Days per month', hint: 'Used to work out the daily rate for unpaid leave' },
+  { key: 'SkbbkFrom', label: 'LINDUNG 24 Jam starts (yyyymm)', hint: 'First payroll month with the SKBBK employee share' },
 ]
 
 function PayrollRates() {
@@ -467,8 +490,8 @@ function PayrollRates() {
   return (
     <div className="form">
       <p className="muted">
-        Statutory contribution rates. The defaults follow the usual rates for Malaysian citizens under 60. Update them when the
-        rules change, and check results against the official KWSP, PERKESO and LHDN tables. PCB is set per employee.
+        EPF rates. SOCSO, EIS and LINDUNG 24 Jam (SKBBK) use PERKESO's official contribution tables (wage ceiling RM6,000),
+        so they need no setting. Each employee's category is set on their profile. PCB is set per employee.
       </p>
       <div className="grid-2">
         {rateFields.map(f => (
