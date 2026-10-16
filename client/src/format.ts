@@ -1,6 +1,23 @@
 const dateFmt = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 const timeFmt = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
-const money = new Intl.NumberFormat('en-MY', { style: 'currency', currency: 'MYR' })
+let currency = 'MYR'
+let money = new Intl.NumberFormat('en-MY', { style: 'currency', currency })
+
+/** Company currency (ISO code), set once the signed-in user is loaded. */
+export function setCurrency(code: string) {
+  try {
+    money = new Intl.NumberFormat(undefined, { style: 'currency', currency: code })
+    currency = code
+  } catch {
+    // unknown code: keep the previous one
+  }
+}
+
+export const currencyCode = () => currency
+
+/** Working days as JS day numbers (Sunday = 0), from the company setting "1,2,3,4,5". */
+export const parseWorkDays = (value: string) =>
+  new Set(value.split(',').map(v => Number(v.trim())).filter(n => Number.isInteger(n) && n >= 0 && n <= 6))
 
 /** Calendar dates are sent as midnight UTC; read only the date part so time zones don't shift them. */
 function calendarDate(value: string) {
@@ -26,7 +43,7 @@ export const monthName = (year: number, month: number) =>
 
 /** Plain number with two decimals and thousands separators, for tables of money. */
 export const amount = (value: number) =>
-  value.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export const approverLabel: Record<string, string> = {
   DirectManager: 'Direct manager',
@@ -34,19 +51,3 @@ export const approverLabel: Record<string, string> = {
   Admin: 'Admin',
   SpecificUser: 'Specific person',
 }
-
-/** Earnings and deductions grouped the way they are reported on the EA form. */
-export const earningCategories: { value: string; label: string }[] = [
-  { value: 'Allowance', label: 'Allowance (taxable)' },
-  { value: 'Salary', label: 'Salary / overtime' },
-  { value: 'Bonus', label: 'Bonus / commission' },
-  { value: 'Exempt', label: 'Tax-exempt' },
-  { value: 'Reimbursement', label: 'Reimbursement' },
-]
-
-export const deductionCategories: { value: string; label: string }[] = [
-  { value: 'Other', label: 'Other deduction' },
-  { value: 'Zakat', label: 'Zakat' },
-  { value: 'Cp38', label: 'CP38' },
-  { value: 'Salary', label: 'Reduces salary (e.g. unpaid leave)' },
-]

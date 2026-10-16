@@ -2,7 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import type { PayslipDetail } from '../api'
 import { useMe } from '../auth'
 import { Loading, useFetch } from '../components/ui'
-import { amount, monthName } from '../format'
+import { amount, currencyCode, monthName } from '../format'
 
 export default function PayslipView() {
   const { id } = useParams()
@@ -34,18 +34,16 @@ export default function PayslipView() {
         <dl className="payslip-info">
           <div><dt>Name</dt><dd>{p.employeeName}</dd></div>
           <div><dt>Employee no.</dt><dd>{p.employeeNo}</dd></div>
-          <div><dt>{p.icNumber || !p.passportNo ? 'IC no.' : 'Passport no.'}</dt><dd>{p.icNumber ?? p.passportNo ?? '—'}</dd></div>
+          <div><dt>{p.icNumber || !p.passportNo ? 'ID no.' : 'Passport no.'}</dt><dd>{p.icNumber ?? p.passportNo ?? '—'}</dd></div>
           <div><dt>Department</dt><dd>{p.department ?? '—'}</dd></div>
           <div><dt>Position</dt><dd>{p.position ?? '—'}</dd></div>
-          <div><dt>EPF no.</dt><dd>{p.epfNo ?? '—'}</dd></div>
-          <div><dt>SOCSO no.</dt><dd>{p.socsoNo ?? '—'}</dd></div>
           <div><dt>Tax no.</dt><dd>{p.taxNo ?? '—'}</dd></div>
           <div><dt>Bank</dt><dd>{p.bankName ? `${p.bankName} ${p.bankAccountNo ?? ''}` : '—'}</dd></div>
         </dl>
 
         <div className="payslip-cols">
           <table>
-            <thead><tr><th>Earnings</th><th className="right">RM</th></tr></thead>
+            <thead><tr><th>Earnings</th><th className="right">{currencyCode()}</th></tr></thead>
             <tbody>
               <tr><td>Basic salary</td><td className="right mono">{amount(p.basicSalary)}</td></tr>
               {earnings.map((l, i) => <tr key={i}><td>{l.name}</td><td className="right mono">{amount(l.amount)}</td></tr>)}
@@ -53,14 +51,15 @@ export default function PayslipView() {
             <tfoot><tr><td>Gross pay</td><td className="right mono">{amount(p.grossPay)}</td></tr></tfoot>
           </table>
           <table>
-            <thead><tr><th>Deductions</th><th className="right">RM</th></tr></thead>
+            <thead><tr><th>Deductions</th><th className="right">{currencyCode()}</th></tr></thead>
             <tbody>
               {deductions.map((l, i) => <tr key={i}><td>{l.name}</td><td className="right mono">{amount(l.amount)}</td></tr>)}
-              <tr><td>EPF (employee)</td><td className="right mono">{amount(p.epfEmployee)}</td></tr>
-              <tr><td>SOCSO (employee)</td><td className="right mono">{amount(p.socsoEmployee)}</td></tr>
-              <tr><td>EIS (employee)</td><td className="right mono">{amount(p.eisEmployee)}</td></tr>
-              {p.skbbkEmployee > 0 && <tr><td>LINDUNG 24 Jam (SKBBK)</td><td className="right mono">{amount(p.skbbkEmployee)}</td></tr>}
-              <tr><td>PCB / MTD</td><td className="right mono">{amount(p.pcb)}</td></tr>
+              {p.contributions.filter(c => c.employee > 0).map((c, i) => (
+                <tr key={`c${i}`}>
+                  <td>{c.name}{c.memberNo && <span className="faint"> · {c.memberNo}</span>}</td>
+                  <td className="right mono">{amount(c.employee)}</td>
+                </tr>
+              ))}
             </tbody>
             <tfoot><tr><td>Total deductions</td><td className="right mono">{amount(p.totalDeductions)}</td></tr></tfoot>
           </table>
@@ -68,15 +67,15 @@ export default function PayslipView() {
 
         <div className="payslip-net">
           <span>Net pay</span>
-          <strong className="mono">RM {amount(p.netPay)}</strong>
+          <strong className="mono">{currencyCode()} {amount(p.netPay)}</strong>
         </div>
 
-        <div className="payslip-employer">
-          <span className="muted">Employer contributions</span>
-          <span>EPF {amount(p.epfEmployer)}</span>
-          <span>SOCSO {amount(p.socsoEmployer)}</span>
-          <span>EIS {amount(p.eisEmployer)}</span>
-        </div>
+        {p.contributions.some(c => c.employer > 0) && (
+          <div className="payslip-employer">
+            <span className="muted">Employer contributions</span>
+            {p.contributions.filter(c => c.employer > 0).map((c, i) => <span key={i}>{c.code} {amount(c.employer)}</span>)}
+          </div>
+        )}
 
         <p className="faint payslip-foot">This is a computer-generated payslip. No signature is required.</p>
       </article>

@@ -14,6 +14,8 @@ export interface Me {
   position: string | null
   isManager: boolean
   companyName: string | null
+  currency: string
+  workDays: string
 }
 
 export interface UserRow {
@@ -177,27 +179,45 @@ export const api = {
 export type PayItemKind = 'Earning' | 'Deduction'
 export type PayLineSource = 'Manual' | 'Recurring' | 'Claim' | 'UnpaidLeave'
 
-export type PayCategory = 'Salary' | 'Bonus' | 'Allowance' | 'Exempt' | 'Reimbursement' | 'Zakat' | 'Cp38' | 'Other'
-export type EpfCategory = 'Standard' | 'Age60Plus' | 'Foreign' | 'None'
-export type SocsoCategory = 'First' | 'Second' | 'None'
+export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean }
 
-export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean; category: PayCategory }
+export type ContributionMethod = 'Percentage' | 'RateBands' | 'AmountBands' | 'Fixed' | 'PerEmployee'
+export type ContributionRounding = 'Cents' | 'NearestWhole' | 'UpWhole'
+
+export interface ContributionBand { upTo: number; employee: number; employer: number; step: number }
+
+export interface ContributionScheme {
+  id: number
+  name: string
+  code: string
+  method: ContributionMethod
+  employeeRate: number
+  employerRate: number
+  wageCeiling: number | null
+  rounding: ContributionRounding
+  effectiveFrom: string | null
+  defaultForNewEmployees: boolean
+  memberNoRequired: boolean
+  employerRef: string | null
+  sortOrder: number
+  isActive: boolean
+  members: number
+  bands: ContributionBand[]
+}
+
+export interface Membership { schemeId: number; memberNo: string | null; employeeAmount: number | null; employerAmount: number | null }
+
+export interface PayslipContribution { schemeId: number | null; name: string; code: string; memberNo: string | null; employee: number; employer: number }
 
 export interface PayDetails {
   basicSalary: number | null
-  monthlyPcb: number | null
   icNumber: string | null
+  passportNo: string | null
+  taxNo: string | null
   bankName: string | null
   bankAccountNo: string | null
-  epfNo: string | null
-  socsoNo: string | null
-  taxNo: string | null
-  passportNo: string | null
-  epfCategory: EpfCategory
-  socsoCategory: SocsoCategory
-  eisEnabled: boolean
-  skbbkEnabled: boolean
   items: PayItem[]
+  contributions: Membership[]
 }
 
 export interface PayrollRunRow {
@@ -226,8 +246,7 @@ export interface PayslipDetail {
   department: string | null
   position: string | null
   icNumber: string | null
-  epfNo: string | null
-  socsoNo: string | null
+  passportNo: string | null
   taxNo: string | null
   bankName: string | null
   bankAccountNo: string | null
@@ -235,18 +254,10 @@ export interface PayslipDetail {
   grossPay: number
   statutoryWage: number
   statutoryOverride: boolean
-  epfEmployee: number
-  epfEmployer: number
-  socsoEmployee: number
-  socsoEmployer: number
-  eisEmployee: number
-  eisEmployer: number
-  skbbkEmployee: number
-  passportNo: string | null
-  epfCategory: EpfCategory
-  socsoCategory: SocsoCategory
-  pcb: number
   totalDeductions: number
+  employerContributions: number
   netPay: number
   lines: PayslipLine[]
+  contributions: PayslipContribution[]
 }
+

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { api, setUnauthorizedHandler, type Me } from './api'
+import { setCurrency } from './format'
 
 interface AuthState {
   me: Me | null
@@ -12,7 +13,11 @@ interface AuthState {
 const AuthContext = createContext<AuthState | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [me, setMe] = useState<Me | null>(null)
+  const [me, setMeState] = useState<Me | null>(null)
+  const setMe = useCallback((value: Me | null) => {
+    if (value) setCurrency(value.currency)
+    setMeState(value)
+  }, [])
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
@@ -21,12 +26,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setMe(null)
     }
-  }, [])
+  }, [setMe])
 
   useEffect(() => {
     setUnauthorizedHandler(() => setMe(null))
     refresh().finally(() => setLoading(false))
-  }, [refresh])
+  }, [refresh, setMe])
 
   const login = async (username: string, password: string) => {
     setMe(await api.post<Me>('/api/auth/login', { username, password }))

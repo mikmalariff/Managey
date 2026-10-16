@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type PayrollRunRow } from '../api'
 import { Empty, ErrorText, Field, Loading, Modal, PageHeader, Status, useFetch } from '../components/ui'
-import { amount, monthName } from '../format'
+import { amount, currencyCode, monthName } from '../format'
 
 export default function Payroll() {
   const navigate = useNavigate()
@@ -22,7 +22,7 @@ export default function Payroll() {
       ) : (
         <div className="table-wrap">
           <table>
-            <thead><tr><th>Month</th><th className="right">Employees</th><th className="right">Net pay (RM)</th><th>Status</th></tr></thead>
+            <thead><tr><th>Month</th><th className="right">Employees</th><th className="right">Net pay ({currencyCode()})</th><th>Status</th></tr></thead>
             <tbody>
               {data.map(r => (
                 <tr key={r.id} className="clickable" onClick={() => navigate(`/payroll/${r.id}`)}>

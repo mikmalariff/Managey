@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, type Holiday, type LeaveBalance, type LeaveType, type RequestType } from '../api'
 import { useMe } from '../auth'
 import { ErrorText, Field, PageHeader, Tabs, useFetch } from '../components/ui'
-import { fmt } from '../format'
+import { currencyCode, fmt, parseWorkDays } from '../format'
 
 const types: { value: RequestType; label: string; hint: string }[] = [
   { value: 'Leave', label: 'Leave', hint: 'Time off from work' },
@@ -12,14 +12,14 @@ const types: { value: RequestType; label: string; hint: string }[] = [
   { value: 'General', label: 'General', hint: 'Any other approval' },
 ]
 
-/** Same rule as the server: Monday to Friday, inclusive, skipping public holidays. */
-function workingDays(start: string, end: string, halfDay: boolean, holidays: Set<string>) {
+/** Same rule as the server: the company's working days, inclusive, skipping public holidays. */
+function workingDays(start: string, end: string, halfDay: boolean, holidays: Set<string>, workDays: Set<number>) {
   if (!start || !end || end < start) return 0
   let days = 0
   const d = new Date(`${start}T00:00:00`)
   const last = new Date(`${end}T00:00:00`)
   while (d <= last) {
-    if (d.getDay() !== 0 && d.getDay() !== 6 && !holidays.has(fmt.isoDate(d))) days++
+    if (workDays.has(d.getDay()) && !holidays.has(fmt.isoDate(d))) days++
     d.setDate(d.getDate() + 1)
   }
   return halfDay && days === 1 ? 0.5 : days
@@ -52,8 +52,8 @@ export default function NewRequest() {
     () => (holidayList ?? []).filter(h => h.date.slice(0, 10) >= startDate && h.date.slice(0, 10) <= endDate),
     [holidayList, startDate, endDate])
   const days = useMemo(
-    () => workingDays(startDate, endDate, halfDay, new Set(holidaysInRange.map(h => h.date.slice(0, 10)))),
-    [startDate, endDate, halfDay, holidaysInRange])
+    () => workingDays(startDate, endDate, halfDay, new Set(holidaysInRange.map(h => h.date.slice(0, 10))), parseWorkDays(me.workDays)),
+    [startDate, endDate, halfDay, holidaysInRange, me.workDays])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -111,7 +111,7 @@ export default function NewRequest() {
             )}
             {startDate && endDate && (
               <p className="muted">
-                {fmt.days(days)} (weekdays only{holidaysInRange.length > 0 && `, excluding ${holidaysInRange.map(h => h.name).join(', ')}`})
+                {fmt.days(days)} (working days only{holidaysInRange.length > 0 && `, excluding ${holidaysInRange.map(h => h.name).join(', ')}`})
                 {balance && ` · ${balance.remaining} ${balance.leaveType} day(s) available`}
               </p>
             )}
@@ -126,7 +126,7 @@ export default function NewRequest() {
                 placeholder={type === 'Claim' ? 'e.g. Travel to client site' : type === 'Purchase' ? 'e.g. Printer toner' : ''} />
             </Field>
             {(type === 'Claim' || type === 'Purchase') && (
-              <Field label="Amount (RM)">
+              <Field label={`Amount (${currencyCode()})`}>
                 <input type="number" min="0.01" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} required />
               </Field>
             )}

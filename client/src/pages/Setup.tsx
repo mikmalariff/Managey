@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { api, type ApproverKind, type Department, type Holiday, type LeaveType, type RequestType, type UserRow } from '../api'
 import { useMe } from '../auth'
 import { ErrorText, Field, Loading, Modal, PageHeader, Status, Tabs, useFetch } from '../components/ui'
-import { approverLabel, fmt } from '../format'
+import { approverLabel, fmt, parseWorkDays } from '../format'
+import PayrollSetup from './PayrollSetup'
 
 type Section = 'departments' | 'leave' | 'holidays' | 'payroll' | 'workflows' | 'email' | 'company'
 
@@ -29,7 +30,7 @@ export default function Setup() {
         {section === 'departments' && <Departments />}
         {section === 'leave' && <LeaveTypes />}
         {section === 'holidays' && <Holidays />}
-        {section === 'payroll' && <PayrollRates />}
+        {section === 'payroll' && <PayrollSetup />}
         {section === 'workflows' && <Workflows />}
         {section === 'email' && <EmailSettings />}
         {section === 'company' && <Company />}
@@ -234,15 +235,8 @@ function Workflows() {
   )
 }
 
-const employerFields: { key: string; label: string; hint?: string; placeholder?: string }[] = [
-  { key: 'CompanyRegNo', label: 'SSM registration no.', placeholder: '201901012345' },
-  { key: 'CompanyPhone', label: 'Phone' },
-  { key: 'EmployerEpfNo', label: 'KWSP employer no.' },
-  { key: 'EmployerSocsoCode', label: 'PERKESO employer code', placeholder: 'E1300001111G', hint: '12 characters, as shown in ASSIST' },
-  { key: 'EmployerTaxNo', label: 'LHDN employer no. (E)', placeholder: 'E 1234567-08' },
-  { key: 'EaSignatoryName', label: 'EA form signed by', hint: 'Officer who certifies the EA form' },
-  { key: 'EaSignatoryPosition', label: 'Signatory position' },
-]
+const currencies = ['MYR', 'SGD', 'IDR', 'THB', 'PHP', 'VND', 'BND', 'USD', 'EUR', 'GBP', 'AUD', 'AED', 'SAR', 'INR', 'CNY', 'JPY']
+const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function Company() {
   const { data } = useFetch<Record<string, string>>('/api/settings')
@@ -253,11 +247,19 @@ function Company() {
   useEffect(() => { if (data) setForm(data) }, [data])
   if (!data) return <Loading />
 
+  const workDays = parseWorkDays(form.WorkDays ?? '1,2,3,4,5')
+  const toggleDay = (day: number) => {
+    const next = new Set(workDays)
+    if (next.has(day)) next.delete(day)
+    else next.add(day)
+    setForm({ ...form, WorkDays: [...next].sort().join(',') })
+  }
+
   const save = async () => {
     setError(null)
     try {
       await api.put('/api/settings', form)
-      setStatus('Saved. Reload the page to see the new company name.')
+      setStatus('Saved. Reload the page to see the changes everywhere.')
     } catch (e) {
       setError((e as Error).message)
     }
@@ -267,6 +269,19 @@ function Company() {
     <div className="form">
       <Field label="Company name"><input value={form.CompanyName ?? ''} onChange={e => setForm({ ...form, CompanyName: e.target.value })} /></Field>
       <div className="grid-2">
+        <Field label="Registration no."><input value={form.CompanyRegNo ?? ''} onChange={e => setForm({ ...form, CompanyRegNo: e.target.value })} /></Field>
+        <Field label="Phone"><input value={form.CompanyPhone ?? ''} onChange={e => setForm({ ...form, CompanyPhone: e.target.value })} /></Field>
+      </div>
+      <Field label="Address">
+        <textarea value={form.CompanyAddress ?? ''} onChange={e => setForm({ ...form, CompanyAddress: e.target.value })} style={{ minHeight: 60 }} />
+      </Field>
+
+      <div className="grid-2">
+        <Field label="Currency" hint="3-letter ISO code">
+          <input list="currencies" value={form.Currency ?? ''} maxLength={3} onChange={e => setForm({ ...form, Currency: e.target.value.toUpperCase() })} />
+          <datalist id="currencies">{currencies.map(c => <option key={c} value={c} />)}</datalist>
+        </Field>
+        <div />
         <Field label="Work starts" hint="Clock-ins after this are marked late">
           <input type="time" value={form.WorkStartTime ?? ''} onChange={e => setForm({ ...form, WorkStartTime: e.target.value })} />
         </Field>
@@ -274,19 +289,16 @@ function Company() {
           <input type="time" value={form.WorkEndTime ?? ''} onChange={e => setForm({ ...form, WorkEndTime: e.target.value })} />
         </Field>
       </div>
-
-      <h2 style={{ marginTop: 8 }}>Employer details</h2>
-      <p className="muted">Used on the KWSP and PERKESO upload files and on EA forms.</p>
-      <div className="grid-2">
-        {employerFields.map(f => (
-          <Field key={f.key} label={f.label} hint={f.hint}>
-            <input value={form[f.key] ?? ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} placeholder={f.placeholder} />
-          </Field>
-        ))}
-      </div>
-      <Field label="Address">
-        <textarea value={form.CompanyAddress ?? ''} onChange={e => setForm({ ...form, CompanyAddress: e.target.value })} style={{ minHeight: 60 }} />
+      <Field label="Working days" hint="Leave only counts these days">
+        <div className="row" style={{ gap: 6 }}>
+          {weekdays.map((d, i) => (
+            <button key={d} type="button" className={workDays.has(i) ? 'primary' : ''} onClick={() => toggleDay(i)} style={{ minWidth: 52, justifyContent: 'center' }}>
+              {d}
+            </button>
+          ))}
+        </div>
       </Field>
+
       <ErrorText error={error} />
       <div className="form-actions">
         <button className="primary" onClick={save}>Save</button>
@@ -450,61 +462,6 @@ function EmailSettings() {
       </div>
       <ErrorText error={error} />
       {status && <p className="muted">{status}</p>}
-    </div>
-  )
-}
-
-const rateFields: { key: string; label: string; hint?: string }[] = [
-  { key: 'EpfEmployee', label: 'EPF employee (%)' },
-  { key: 'EpfEmployerLow', label: 'EPF employer, wages up to threshold (%)' },
-  { key: 'EpfEmployerHigh', label: 'EPF employer, wages above threshold (%)' },
-  { key: 'EpfEmployerThreshold', label: 'EPF employer threshold (RM)' },
-  { key: 'EpfEmployee60', label: 'EPF employee, aged 60+ (%)' },
-  { key: 'EpfEmployer60', label: 'EPF employer, aged 60+ (%)' },
-  { key: 'EpfForeignEmployee', label: 'EPF employee, foreign worker (%)' },
-  { key: 'EpfForeignEmployer', label: 'EPF employer, foreign worker (%)' },
-  { key: 'DaysPerMonth', label: 'Days per month', hint: 'Used to work out the daily rate for unpaid leave' },
-  { key: 'SkbbkFrom', label: 'LINDUNG 24 Jam starts (yyyymm)', hint: 'First payroll month with the SKBBK employee share' },
-]
-
-function PayrollRates() {
-  const { data } = useFetch<Record<string, number>>('/api/payroll/settings')
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [status, setStatus] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => { if (data) setForm(Object.fromEntries(Object.entries(data).map(([k, v]) => [k, String(v)]))) }, [data])
-  if (!data) return <Loading />
-
-  const save = async () => {
-    setError(null)
-    setStatus(null)
-    try {
-      await api.put('/api/payroll/settings', Object.fromEntries(Object.entries(form).map(([k, v]) => [k, Number(v)])))
-      setStatus('Saved. New rates apply to payslips you create or rebuild from now on.')
-    } catch (e) {
-      setError((e as Error).message)
-    }
-  }
-
-  return (
-    <div className="form">
-      <p className="muted">
-        EPF rates. SOCSO, EIS and LINDUNG 24 Jam (SKBBK) use PERKESO's official contribution tables (wage ceiling RM6,000),
-        so they need no setting. Each employee's category is set on their profile. PCB is set per employee.
-      </p>
-      <div className="grid-2">
-        {rateFields.map(f => (
-          <Field key={f.key} label={f.label} hint={f.hint}>
-            <input type="number" min="0" step="0.01" value={form[f.key] ?? ''} onChange={e => setForm({ ...form, [f.key]: e.target.value })} />
-          </Field>
-        ))}
-      </div>
-      <ErrorText error={error} />
-      <div className="form-actions">
-        <button className="primary" onClick={save}>Save</button>
-        {status && <span className="muted" style={{ alignSelf: 'center' }}>{status}</span>}
-      </div>
     </div>
   )
 }

@@ -21,8 +21,6 @@ import PayslipView from './pages/PayslipView'
 import Payroll from './pages/Payroll'
 import PayrollRun from './pages/PayrollRun'
 import ImportPeople from './pages/ImportPeople'
-import EaList from './pages/EaList'
-import EaView, { EaPrintAll } from './pages/EaForm'
 
 export default function App() {
   const { me, loading } = useAuth()
@@ -71,8 +69,7 @@ function Shell() {
           <nav className="nav-group">
             <div className="nav-group-title">Manage</div>
             {isHR && <NavLink to="/requests/all">All requests</NavLink>}
-            {isHR && <NavLink to="/payroll" end>Payroll</NavLink>}
-            {isHR && <NavLink to="/payroll/ea">EA forms</NavLink>}
+            {isHR && <NavLink to="/payroll">Payroll</NavLink>}
             <NavLink to="/attendance/team">{isHR ? 'Attendance report' : 'Team attendance'}</NavLink>
             {isHR && <NavLink to="/setup">Setup</NavLink>}
             {isAdmin && <NavLink to="/audit">Audit log</NavLink>}
@@ -107,9 +104,6 @@ function Shell() {
           <Route path="/payslips/:id" element={<PayslipView />} />
           <Route path="/payroll" element={isHR ? <Payroll /> : <Navigate to="/" />} />
           <Route path="/payroll/:id" element={isHR ? <PayrollRun /> : <Navigate to="/" />} />
-          <Route path="/payroll/ea" element={isHR ? <EaList /> : <Navigate to="/" />} />
-          <Route path="/ea/:year/all" element={isHR ? <EaPrintAll /> : <Navigate to="/" />} />
-          <Route path="/ea/:year/:userId" element={<EaView />} />
           <Route path="/people/:id" element={<PersonEdit />} />
           <Route path="/documents" element={<Documents />} />
           <Route path="/setup" element={isHR ? <Setup /> : <Navigate to="/" />} />
