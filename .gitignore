@@ -10,3 +10,4 @@ dist/
 server/Managey.Api/wwwroot/
 server/Managey.Api/data/
 publish/
+server/Managey.Api/design.db

@@ -7,13 +7,15 @@ public record LeaveBalance(int LeaveTypeId, string LeaveType, decimal Entitlemen
 
 public class LeaveService(AppDbContext db)
 {
-    /// <summary>Counts Monday–Friday days between two dates, inclusive.</summary>
-    public static decimal CountWorkingDays(DateTime start, DateTime end, bool halfDay)
+    /// <summary>Counts Monday–Friday days between two dates, inclusive, skipping public holidays.</summary>
+    public async Task<decimal> CountWorkingDaysAsync(DateTime start, DateTime end, bool halfDay)
     {
+        var holidays = (await db.Holidays.Where(h => h.Date >= start.Date && h.Date <= end.Date).Select(h => h.Date).ToListAsync())
+            .Select(d => d.Date).ToHashSet();
         decimal days = 0;
         for (var d = start.Date; d <= end.Date; d = d.AddDays(1))
         {
-            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday)) days++;
+            if (d.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && !holidays.Contains(d)) days++;
         }
         return halfDay && days == 1 ? 0.5m : days;
     }

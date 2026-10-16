@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 using Managey.Api.Data;
 using Managey.Api.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -18,23 +19,31 @@ builder.Host.UseWindowsService(options => options.ServiceName = "Managey");
 
 var provider = builder.Configuration["Database:Provider"] ?? "Sqlite";
 var connectionString = builder.Configuration["Database:ConnectionString"] ?? "Data Source=data/managey.db";
-builder.Services.AddDbContext<AppDbContext>(options =>
+if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
 {
-    if (provider.Equals("SqlServer", StringComparison.OrdinalIgnoreCase))
-    {
-        options.UseSqlServer(connectionString);
-        return;
-    }
+    builder.Services.AddDbContext<AppDbContext, SqlServerAppDbContext>(options => options.UseSqlServer(connectionString));
+}
+else
+{
     var csb = new SqliteConnectionStringBuilder(connectionString);
     csb.DataSource = Path.GetFullPath(csb.DataSource, builder.Environment.ContentRootPath);
     Directory.CreateDirectory(Path.GetDirectoryName(csb.DataSource)!);
-    options.UseSqlite(csb.ToString());
-});
+    builder.Services.AddDbContext<AppDbContext, SqliteAppDbContext>(options => options.UseSqlite(csb.ToString()));
+}
+
+// Keys encrypt sign-in cookies and the stored SMTP password; keep them with the data so they survive restarts.
+builder.Services.AddDataProtection()
+    .SetApplicationName("Managey")
+    .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(builder.Environment.ContentRootPath, "data", "keys")));
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<AuditService>();
 builder.Services.AddScoped<LeaveService>();
 builder.Services.AddScoped<WorkflowService>();
+builder.Services.AddScoped<EmailSettings>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddSingleton<EmailQueue>();
+builder.Services.AddHostedService<EmailSender>();
 builder.Services.AddSingleton<FileStorage>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
@@ -61,7 +70,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
+    await db.Database.MigrateAsync();
     await DbSeeder.SeedAsync(db, app.Configuration, scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>());
 }
 

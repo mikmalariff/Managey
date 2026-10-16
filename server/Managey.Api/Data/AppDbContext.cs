@@ -3,7 +3,10 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Managey.Api.Data;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
+/// <summary>
+/// Shared model. Each database provider has its own subclass so it can keep its own migrations.
+/// </summary>
+public abstract class AppDbContext(DbContextOptions options) : DbContext(options)
 {
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<User> Users => Set<User>();
@@ -16,6 +19,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Document> Documents => Set<Document>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
+    public DbSet<Holiday> Holidays => Set<Holiday>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder builder)
     {
@@ -74,6 +78,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
         b.Entity<AuditLog>().HasIndex(x => x.Timestamp);
         b.Entity<Setting>().HasKey(x => x.Key);
+        b.Entity<Holiday>().HasIndex(x => x.Date).IsUnique();
     }
 }
 

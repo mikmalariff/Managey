@@ -162,3 +162,118 @@ public class AuditController(AppDbContext db) : ControllerBase
         return Ok(new { total, page, pageSize, items });
     }
 }
+
+[ApiController]
+[Route("api/holidays")]
+[Authorize]
+public class HolidaysController(AppDbContext db, AuditService audit) : ControllerBase
+{
+    public record HolidayInput(DateTime Date, string Name);
+
+    [HttpGet]
+    public async Task<IActionResult> List([FromQuery] int? year)
+    {
+        var start = new DateTime(year ?? DateTime.Today.Year, 1, 1);
+        return Ok(await db.Holidays
+            .Where(h => h.Date >= start && h.Date < start.AddYears(1))
+            .OrderBy(h => h.Date)
+            .Select(h => new { h.Id, h.Date, h.Name })
+            .ToListAsync());
+    }
+
+    [HttpPost]
+    [Authorize(Roles = Roles.AdminOrHR)]
+    public async Task<IActionResult> Create(HolidayInput input)
+    {
+        if (string.IsNullOrWhiteSpace(input.Name)) return BadRequest(new { message = "Name is required." });
+        var date = input.Date.Date;
+        if (await db.Holidays.AnyAsync(h => h.Date == date)) return BadRequest(new { message = "There is already a holiday on that date." });
+        var holiday = new Holiday { Date = date, Name = input.Name.Trim() };
+        db.Holidays.Add(holiday);
+        await db.SaveChangesAsync();
+        audit.Log("Create", nameof(Holiday), holiday.Id, $"{date:yyyy-MM-dd} {holiday.Name}");
+        await db.SaveChangesAsync();
+        return Ok(new { holiday.Id });
+    }
+
+    [HttpDelete("{id:int}")]
+    [Authorize(Roles = Roles.AdminOrHR)]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var holiday = await db.Holidays.FindAsync(id);
+        if (holiday is null) return NotFound();
+        db.Holidays.Remove(holiday);
+        audit.Log("Delete", nameof(Holiday), id, $"{holiday.Date:yyyy-MM-dd} {holiday.Name}");
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+}
+
+/// <summary>SMTP settings for email notifications. Admin only; the password is never returned.</summary>
+[ApiController]
+[Route("api/settings/email")]
+[Authorize(Roles = Roles.Admin)]
+public class EmailSettingsController(AppDbContext db, AuditService audit, EmailSettings settings) : ControllerBase
+{
+    public record EmailInput(bool Enabled, string? Host, int Port, string Security, string? Username, string? Password, string? From);
+    public record TestInput(string To);
+
+    [HttpGet]
+    public async Task<IActionResult> Get()
+    {
+        var c = await settings.LoadAsync();
+        var passwordSet = await db.Settings.AnyAsync(s => s.Key == EmailSettings.Prefix + "Password" && s.Value != null && s.Value != "");
+        return Ok(new { c.Enabled, c.Host, c.Port, c.Security, c.Username, c.From, PasswordSet = passwordSet });
+    }
+
+    /// <summary>Password: null keeps the stored one, empty string clears it.</summary>
+    [HttpPut]
+    public async Task<IActionResult> Update(EmailInput input)
+    {
+        if (input.Enabled && (string.IsNullOrWhiteSpace(input.Host) || string.IsNullOrWhiteSpace(input.From)))
+            return BadRequest(new { message = "Server and sender address are required to turn on email." });
+        if (input.Port is < 1 or > 65535) return BadRequest(new { message = "Port must be between 1 and 65535." });
+        if (input.Security is not ("Auto" or "None" or "StartTls" or "Ssl")) return BadRequest(new { message = "Unknown security option." });
+
+        var values = new Dictionary<string, string?>
+        {
+            ["Enabled"] = input.Enabled ? "true" : "false",
+            ["Host"] = input.Host?.Trim(),
+            ["Port"] = input.Port.ToString(),
+            ["Security"] = input.Security,
+            ["Username"] = input.Username?.Trim(),
+            ["From"] = input.From?.Trim(),
+        };
+        if (input.Password is not null)
+            values["Password"] = input.Password == "" ? "" : settings.Protect(input.Password);
+
+        foreach (var (name, value) in values)
+        {
+            var key = EmailSettings.Prefix + name;
+            var row = await db.Settings.FindAsync(key);
+            if (row is null) db.Settings.Add(new Setting { Key = key, Value = value });
+            else row.Value = value;
+        }
+        audit.Log("Update", nameof(Setting), null, "Email settings");
+        await db.SaveChangesAsync();
+        return NoContent();
+    }
+
+    [HttpPost("test")]
+    public async Task<IActionResult> Test(TestInput input)
+    {
+        var config = await settings.LoadAsync();
+        if (string.IsNullOrEmpty(config.Host) || string.IsNullOrEmpty(config.From))
+            return BadRequest(new { message = "Save the server and sender address first." });
+        try
+        {
+            await EmailSettings.SendAsync(config, new EmailMessage(input.To, input.To, "Managey test email",
+                "This is a test email from Managey. If you can read this, email notifications are working.\n\n— Managey"));
+            return NoContent();
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"Could not send: {ex.Message}" });
+        }
+    }
+}

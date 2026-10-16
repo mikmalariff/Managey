@@ -157,3 +157,11 @@ public class Setting
     public string Key { get; set; } = "";
     public string? Value { get; set; }
 }
+
+public class Holiday
+{
+    public int Id { get; set; }
+    /// <summary>Calendar date (no time part).</summary>
+    public DateTime Date { get; set; }
+    public string Name { get; set; } = "";
+}

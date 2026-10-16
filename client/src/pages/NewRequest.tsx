@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type LeaveBalance, type LeaveType, type RequestType } from '../api'
+import { api, type Holiday, type LeaveBalance, type LeaveType, type RequestType } from '../api'
 import { useMe } from '../auth'
 import { ErrorText, Field, PageHeader, Tabs, useFetch } from '../components/ui'
 import { fmt } from '../format'
@@ -12,14 +12,14 @@ const types: { value: RequestType; label: string; hint: string }[] = [
   { value: 'General', label: 'General', hint: 'Any other approval' },
 ]
 
-/** Same rule as the server: Monday to Friday, inclusive. */
-function workingDays(start: string, end: string, halfDay: boolean) {
+/** Same rule as the server: Monday to Friday, inclusive, skipping public holidays. */
+function workingDays(start: string, end: string, halfDay: boolean, holidays: Set<string>) {
   if (!start || !end || end < start) return 0
   let days = 0
   const d = new Date(`${start}T00:00:00`)
   const last = new Date(`${end}T00:00:00`)
   while (d <= last) {
-    if (d.getDay() !== 0 && d.getDay() !== 6) days++
+    if (d.getDay() !== 0 && d.getDay() !== 6 && !holidays.has(fmt.isoDate(d))) days++
     d.setDate(d.getDate() + 1)
   }
   return halfDay && days === 1 ? 0.5 : days
@@ -44,10 +44,16 @@ export default function NewRequest() {
   const { data: leaveTypes } = useFetch<LeaveType[]>('/api/leave-types')
   const year = startDate ? Number(startDate.slice(0, 4)) : new Date().getFullYear()
   const { data: balances } = useFetch<LeaveBalance[]>(`/api/users/${me.id}/leave?year=${year}`)
+  const { data: holidayList } = useFetch<Holiday[]>(`/api/holidays?year=${year}`)
 
   const selectedType = leaveTypes?.find(t => t.id === Number(leaveTypeId))
   const balance = balances?.find(b => b.leaveTypeId === Number(leaveTypeId))
-  const days = useMemo(() => workingDays(startDate, endDate, halfDay), [startDate, endDate, halfDay])
+  const holidaysInRange = useMemo(
+    () => (holidayList ?? []).filter(h => h.date.slice(0, 10) >= startDate && h.date.slice(0, 10) <= endDate),
+    [holidayList, startDate, endDate])
+  const days = useMemo(
+    () => workingDays(startDate, endDate, halfDay, new Set(holidaysInRange.map(h => h.date.slice(0, 10)))),
+    [startDate, endDate, halfDay, holidaysInRange])
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -105,7 +111,7 @@ export default function NewRequest() {
             )}
             {startDate && endDate && (
               <p className="muted">
-                {fmt.days(days)} (weekdays only)
+                {fmt.days(days)} (weekdays only{holidaysInRange.length > 0 && `, excluding ${holidaysInRange.map(h => h.name).join(', ')}`})
                 {balance && ` · ${balance.remaining} ${balance.leaveType} day(s) available`}
               </p>
             )}

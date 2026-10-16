@@ -38,6 +38,8 @@ export interface Department { id: number; name: string; headcount: number }
 
 export interface LeaveType { id: number; name: string; defaultDays: number; requiresAttachment: boolean; isActive: boolean }
 
+export interface Holiday { id: number; date: string; name: string }
+
 export interface LeaveBalance {
   leaveTypeId: number
   leaveType: string

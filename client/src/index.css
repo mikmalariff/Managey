@@ -1,4 +1,4 @@
-/* Managey — minimal, near-monochrome UI. Colour is reserved for errors only. */
+/* Managey — minimal UI in white, black and a single burgundy accent. */
 
 :root {
   --bg: #fafafa;
@@ -9,9 +9,11 @@
   --border: #e6e6e6;
   --border-strong: #cfcfcf;
   --hover: #f2f2f2;
-  --primary: #111111;
+  --primary: #7b1e2e;
+  --primary-hover: #651826;
   --primary-text: #ffffff;
-  --danger: #b42318;
+  --accent-soft: #f6eced;
+  --danger: #7b1e2e;
   --radius: 6px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
@@ -28,9 +30,11 @@
     --border: #262626;
     --border-strong: #3a3a3a;
     --hover: #1f1f1f;
-    --primary: #ededed;
-    --primary-text: #111111;
-    --danger: #f97066;
+    --primary: #9e2a3d;
+    --primary-hover: #b33349;
+    --primary-text: #ffffff;
+    --accent-soft: #2a1519;
+    --danger: #e0798a;
     color-scheme: dark;
   }
 }
@@ -78,7 +82,9 @@ a { color: inherit; }
 }
 
 .brand { padding: 0 8px; }
-.brand strong { display: block; font-size: 15px; letter-spacing: -0.01em; }
+.brand strong { display: flex; align-items: center; gap: 8px; font-size: 15px; letter-spacing: -0.01em; }
+.brand strong::before { content: ''; width: 12px; height: 12px; border-radius: 3px; background: var(--primary); }
+.brand span { display: block; padding-left: 20px; }
 .brand span { font-size: 12px; color: var(--muted); }
 
 .nav-group { display: flex; flex-direction: column; gap: 1px; }
@@ -99,7 +105,7 @@ a { color: inherit; }
   color: var(--muted);
 }
 .nav-group a:hover { background: var(--hover); color: var(--text); }
-.nav-group a.active { background: var(--hover); color: var(--text); font-weight: 500; }
+.nav-group a.active { background: var(--accent-soft); color: var(--text); font-weight: 500; box-shadow: inset 2px 0 0 var(--primary); }
 .count { font-size: 11px; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--primary); color: var(--primary-text); text-align: center; }
 
 .sidebar-foot { margin-top: auto; padding: 12px 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
@@ -129,6 +135,7 @@ a { color: inherit; }
 .stat { padding: 16px 20px; border-right: 1px solid var(--border); }
 .stat:last-child { border-right: 0; }
 .stat .label { font-size: 12px; color: var(--muted); }
+.stat.highlight .value { color: var(--primary); }
 .stat .value { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin-top: 2px; }
 .stat .sub { font-size: 12px; color: var(--faint); }
 
@@ -153,7 +160,7 @@ tbody tr.clickable:hover td { background: var(--hover); }
 .status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; white-space: nowrap; }
 .status::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid currentColor; }
 .status-approved::before, .status-present::before { background: currentColor; }
-.status-pending { color: var(--text); }
+.status-pending { color: var(--primary); }
 .status-waiting, .status-skipped, .status-cancelled, .status-inactive { color: var(--faint); }
 .status-rejected { color: var(--text); text-decoration: line-through; text-decoration-color: var(--faint); }
 .status-rejected::before { border-radius: 1px; background: currentColor; transform: rotate(45deg); width: 6px; height: 6px; }
@@ -179,7 +186,7 @@ button, .button {
 button:hover, .button:hover { background: var(--hover); }
 button:disabled { opacity: 0.5; cursor: default; }
 button.primary, .button.primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
-button.primary:hover, .button.primary:hover { opacity: 0.88; background: var(--primary); }
+button.primary:hover, .button.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 button.ghost { border-color: transparent; background: transparent; }
 button.ghost:hover { background: var(--hover); }
 button.link { border: 0; background: none; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; font-weight: 400; }
@@ -197,7 +204,8 @@ input, select, textarea {
   color: var(--text);
 }
 textarea { min-height: 80px; resize: vertical; }
-input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--text); outline-offset: 1px; }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+input[type='checkbox'] { accent-color: var(--primary); }
 input[type='checkbox'] { width: auto; }
 input[type='file'] { padding: 5px; }
 
@@ -217,7 +225,7 @@ input[type='file'] { padding: 5px; }
 .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
 .tabs button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 0; color: var(--muted); margin-bottom: -1px; }
 .tabs button:hover { background: none; color: var(--text); }
-.tabs button.active { color: var(--text); border-bottom-color: var(--text); }
+.tabs button.active { color: var(--text); border-bottom-color: var(--primary); }
 
 /* ---------- Timeline (approval steps) ---------- */
 
@@ -228,7 +236,7 @@ input[type='file'] { padding: 5px; }
 .timeline li:last-child { padding-bottom: 0; }
 .timeline li:last-child::after { display: none; }
 .timeline li.approved::before { background: var(--text); border-color: var(--text); }
-.timeline li.pending::before { border-color: var(--text); }
+.timeline li.pending::before { border-color: var(--primary); background: var(--accent-soft); }
 .timeline li.rejected::before { background: var(--text); border-color: var(--text); border-radius: 1px; transform: rotate(45deg); }
 .timeline .comment { margin-top: 4px; padding: 6px 10px; border-left: 2px solid var(--border-strong); color: var(--muted); }
 

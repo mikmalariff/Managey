@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { api, type ApproverKind, type Department, type LeaveType, type RequestType, type UserRow } from '../api'
+import { api, type ApproverKind, type Department, type Holiday, type LeaveType, type RequestType, type UserRow } from '../api'
 import { useMe } from '../auth'
 import { ErrorText, Field, Loading, Modal, PageHeader, Status, Tabs, useFetch } from '../components/ui'
-import { approverLabel } from '../format'
+import { approverLabel, fmt } from '../format'
 
-type Section = 'departments' | 'leave' | 'workflows' | 'company'
+type Section = 'departments' | 'leave' | 'holidays' | 'workflows' | 'email' | 'company'
 
 export default function Setup() {
   const { isAdmin } = useMe()
@@ -12,7 +12,12 @@ export default function Setup() {
   const options: { value: Section; label: string }[] = [
     { value: 'departments', label: 'Departments' },
     { value: 'leave', label: 'Leave types' },
-    ...(isAdmin ? [{ value: 'workflows' as Section, label: 'Approval flows' }, { value: 'company' as Section, label: 'Company' }] : []),
+    { value: 'holidays', label: 'Public holidays' },
+    ...(isAdmin ? [
+      { value: 'workflows' as Section, label: 'Approval flows' },
+      { value: 'email' as Section, label: 'Email' },
+      { value: 'company' as Section, label: 'Company' },
+    ] : []),
   ]
 
   return (
@@ -22,7 +27,9 @@ export default function Setup() {
         <Tabs value={section} options={options} onChange={setSection} />
         {section === 'departments' && <Departments />}
         {section === 'leave' && <LeaveTypes />}
+        {section === 'holidays' && <Holidays />}
         {section === 'workflows' && <Workflows />}
+        {section === 'email' && <EmailSettings />}
         {section === 'company' && <Company />}
       </div>
     </div>
@@ -255,6 +262,164 @@ function Company() {
         <button className="primary" onClick={save}>Save</button>
         {status && <span className="muted" style={{ alignSelf: 'center' }}>{status}</span>}
       </div>
+    </div>
+  )
+}
+
+function Holidays() {
+  const thisYear = new Date().getFullYear()
+  const [year, setYear] = useState(thisYear)
+  const { data, reload } = useFetch<Holiday[]>(`/api/holidays?year=${year}`)
+  const [date, setDate] = useState('')
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const add = async () => {
+    setError(null)
+    try {
+      await api.post('/api/holidays', { date, name })
+      setDate('')
+      setName('')
+      if (Number(date.slice(0, 4)) !== year) setYear(Number(date.slice(0, 4)))
+      else reload()
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
+  const remove = async (h: Holiday) => {
+    if (!confirm(`Remove ${h.name}?`)) return
+    await api.del(`/api/holidays/${h.id}`)
+    reload()
+  }
+
+  return (
+    <div className="stack" style={{ maxWidth: 640 }}>
+      <p className="muted">Public holidays are not counted as leave days. Add your state's holidays at the start of each year.</p>
+      <form className="row" onSubmit={e => { e.preventDefault(); add() }}>
+        <input type="date" value={date} onChange={e => setDate(e.target.value)} required style={{ width: 170 }} />
+        <input placeholder="Holiday name, e.g. Hari Raya Aidilfitri" value={name} onChange={e => setName(e.target.value)} required style={{ flex: 1 }} />
+        <button className="primary">Add</button>
+      </form>
+      <ErrorText error={error} />
+      <div className="spread">
+        <h2>{year}</h2>
+        <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ width: 'auto' }}>
+          {[thisYear - 1, thisYear, thisYear + 1].map(y => <option key={y}>{y}</option>)}
+        </select>
+      </div>
+      {!data ? <Loading /> : (
+        <div className="table-wrap">
+          <table>
+            <tbody>
+              {data.length === 0 && <tr><td className="muted">No public holidays for {year}.</td></tr>}
+              {data.map(h => (
+                <tr key={h.id}>
+                  <td className="nowrap" style={{ width: 140 }}>{fmt.date(h.date)}</td>
+                  <td className="muted nowrap" style={{ width: 90 }}>
+                    {new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(new Date(`${h.date.slice(0, 10)}T00:00:00`))}
+                  </td>
+                  <td>{h.name}</td>
+                  <td className="right"><button className="link" onClick={() => remove(h)}>Remove</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface EmailForm {
+  enabled: boolean
+  host: string
+  port: number
+  security: string
+  username: string
+  from: string
+  passwordSet: boolean
+}
+
+function EmailSettings() {
+  const { data } = useFetch<EmailForm>('/api/settings/email')
+  const [form, setForm] = useState<EmailForm | null>(null)
+  const [password, setPassword] = useState('')
+  const [testTo, setTestTo] = useState('')
+  const [status, setStatus] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { if (data) setForm({ ...data, host: data.host ?? '', username: data.username ?? '', from: data.from ?? '' }) }, [data])
+  if (!form) return <Loading />
+
+  const run = async (action: () => Promise<void>, done: string) => {
+    setBusy(true)
+    setError(null)
+    setStatus(null)
+    try {
+      await action()
+      setStatus(done)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const save = () => run(async () => {
+    await api.put('/api/settings/email', { ...form, password: password === '' ? null : password })
+    if (password) setForm({ ...form, passwordSet: true })
+    setPassword('')
+  }, 'Saved.')
+
+  const test = () => run(() => api.post('/api/settings/email/test', { to: testTo }), `Test email sent to ${testTo}.`)
+
+  return (
+    <div className="form">
+      <p className="muted">
+        Managey emails approvers when a request needs them, and tells the requester when it is approved or rejected.
+        Use your company mail server (for example Microsoft 365: smtp.office365.com, port 587).
+      </p>
+      <label className="check">
+        <input type="checkbox" checked={form.enabled} onChange={e => setForm({ ...form, enabled: e.target.checked })} />
+        Send email notifications
+      </label>
+      <div className="grid-2">
+        <Field label="SMTP server"><input value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} placeholder="smtp.example.com" /></Field>
+        <div className="grid-2">
+          <Field label="Port"><input type="number" value={form.port} onChange={e => setForm({ ...form, port: Number(e.target.value) })} /></Field>
+          <Field label="Security">
+            <select value={form.security} onChange={e => setForm({ ...form, security: e.target.value })}>
+              <option value="Auto">Auto</option>
+              <option value="StartTls">STARTTLS</option>
+              <option value="Ssl">SSL/TLS</option>
+              <option value="None">None</option>
+            </select>
+          </Field>
+        </div>
+        <Field label="Username" hint="Leave blank if the server does not need sign-in">
+          <input value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} autoComplete="off" />
+        </Field>
+        <Field label="Password" hint={form.passwordSet ? 'Saved. Leave blank to keep it.' : 'Stored encrypted on the server'}>
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password"
+            placeholder={form.passwordSet ? '••••••••' : ''} />
+        </Field>
+        <Field label="Send from" hint="e.g. hr@yourcompany.com">
+          <input type="email" value={form.from} onChange={e => setForm({ ...form, from: e.target.value })} />
+        </Field>
+      </div>
+      <div className="form-actions">
+        <button className="primary" disabled={busy} onClick={save}>Save</button>
+      </div>
+
+      <h2 style={{ marginTop: 8 }}>Send a test</h2>
+      <div className="row">
+        <input type="email" placeholder="you@yourcompany.com" value={testTo} onChange={e => setTestTo(e.target.value)} style={{ flex: 1 }} />
+        <button disabled={busy || !testTo} onClick={test}>{busy ? 'Sending…' : 'Send test email'}</button>
+      </div>
+      <ErrorText error={error} />
+      {status && <p className="muted">{status}</p>}
     </div>
   )
 }

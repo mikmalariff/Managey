@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
-import type { LeaveBalance, RequestStatus, RequestType } from '../api'
+import type { Holiday, LeaveBalance, RequestStatus, RequestType } from '../api'
 import { useMe } from '../auth'
 import { Empty, Loading, PageHeader, Status, useFetch } from '../components/ui'
 import { fmt } from '../format'
@@ -23,6 +23,9 @@ export default function Dashboard() {
   const { me } = useMe()
   const navigate = useNavigate()
   const { data, error } = useFetch<DashboardData>('/api/dashboard')
+  const { data: holidays } = useFetch<Holiday[]>('/api/holidays')
+  const today = fmt.isoDate(new Date())
+  const nextHoliday = holidays?.find(h => h.date.slice(0, 10) >= today)
 
   if (error) return <p className="error">{error}</p>
   if (!data) return <Loading />
@@ -61,7 +64,7 @@ export default function Dashboard() {
           <div className="value">{data.myPending}</div>
           <div className="sub"><Link to="/requests">View all</Link></div>
         </div>
-        <div className="stat">
+        <div className={`stat ${data.toApprove > 0 ? 'highlight' : ''}`}>
           <div className="label">Waiting for my approval</div>
           <div className="value">{data.toApprove}</div>
           <div className="sub"><Link to="/approvals">Review</Link></div>
@@ -102,6 +105,9 @@ export default function Dashboard() {
 
         <section className="card">
           <h2>Out of office today</h2>
+          {nextHoliday && (
+            <p className="muted" style={{ marginBottom: 8 }}>Next public holiday: {nextHoliday.name}, {fmt.date(nextHoliday.date)}</p>
+          )}
           {data.onLeaveToday.length === 0 ? <p className="muted">Everyone is in today.</p> : (
             <table>
               <tbody>

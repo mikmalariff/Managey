@@ -11,7 +11,8 @@ namespace Managey.Api.Controllers;
 [Route("api/requests")]
 [Authorize]
 public class RequestsController(
-    AppDbContext db, AuditService audit, WorkflowService workflow, LeaveService leave, FileStorage files) : ControllerBase
+    AppDbContext db, AuditService audit, WorkflowService workflow, LeaveService leave, FileStorage files,
+    NotificationService notify) : ControllerBase
 {
     public class RequestInput
     {
@@ -148,6 +149,7 @@ public class RequestsController(
         await db.SaveChangesAsync();
         audit.Log("Create", nameof(Request), request.Id, $"{request.RefNo} {request.Title}");
         await db.SaveChangesAsync();
+        await notify.RequestChangedAsync(request.Id);
         return Ok(new { request.Id, request.RefNo });
     }
 
@@ -183,6 +185,7 @@ public class RequestsController(
         WorkflowService.Act(request, step, approve, comment, User.UserId());
         audit.Log(approve ? "Approve" : "Reject", nameof(Request), id, $"{request.RefNo} step {step.StepOrder}");
         await db.SaveChangesAsync();
+        await notify.RequestChangedAsync(id);
         return NoContent();
     }
 
@@ -200,8 +203,8 @@ public class RequestsController(
         if (input.HalfDay && start != end) return "Half day leave must be a single day.";
         if (type.RequiresAttachment && input.Files.Count == 0) return $"{type.Name} leave requires a supporting document.";
 
-        var days = LeaveService.CountWorkingDays(start, end, input.HalfDay);
-        if (days == 0) return "The selected dates have no working days.";
+        var days = await leave.CountWorkingDaysAsync(start, end, input.HalfDay);
+        if (days == 0) return "The selected dates fall on weekends or public holidays.";
 
         var overlaps = await db.Requests.AnyAsync(r =>
             r.RequesterId == userId && r.Type == RequestType.Leave

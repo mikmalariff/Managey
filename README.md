@@ -5,10 +5,11 @@ HR and approvals software for small and medium businesses. It runs on your own W
 ## Features
 
 - **Attendance**: clock in and out, late marking, team and company reports, CSV export
-- **Leave**: leave types and yearly entitlement, per-person overrides, balances, half days, overlap and balance checks
+- **Leave**: leave types and yearly entitlement, per-person overrides, balances, half days, overlap and balance checks; weekends and public holidays are not counted
 - **Requests and approvals**: leave, claims, purchases and general requests, each with attachments and a configurable multi-step approval chain (direct manager, HR, admin or a specific person)
 - **People**: employee directory, departments, reporting lines, roles (Admin, HR, Manager, Staff)
 - **Documents**: company library for policies, forms and handbooks
+- **Email notifications**: approvers are emailed when a request needs them, and requesters when it is decided (any SMTP server, e.g. Microsoft 365)
 - **Audit log**: every change is recorded with who did it and when
 
 ## Tech
@@ -19,7 +20,7 @@ HR and approvals software for small and medium businesses. It runs on your own W
 | Database | SQLite (default, zero setup) or SQL Server |
 | Client | React + TypeScript (Vite), served by the server |
 
-Uploaded files and the SQLite database live in `data\` next to the executable. Back that folder up.
+Uploaded files, the SQLite database and the encryption keys live in `data\` next to the executable. Back that folder up. The database schema is upgraded automatically on start (EF Core migrations).
 
 ## Install on Windows Server
 
@@ -52,6 +53,18 @@ cd client && npm install && npm run dev
 ## First-time setup
 
 1. **Setup → Company**: company name and working hours, which decide late marking.
-2. **Setup → Departments** and **Leave types**.
+2. **Setup → Departments**, **Leave types** and **Public holidays**.
 3. **People → Add employee**: set *Reports to*, because that person approves the employee's requests first.
 4. **Setup → Approval flows**: adjust who approves each request type.
+5. **Setup → Email**: enter your mail server and send a test email.
+
+## Changing the database model
+
+After changing entities, add a migration for **both** providers:
+
+```bash
+dotnet tool install -g dotnet-ef --version 8.0.11
+cd server/Managey.Api
+dotnet ef migrations add <Name> --context SqliteAppDbContext --output-dir Migrations/Sqlite
+dotnet ef migrations add <Name> --context SqlServerAppDbContext --output-dir Migrations/SqlServer
+```
