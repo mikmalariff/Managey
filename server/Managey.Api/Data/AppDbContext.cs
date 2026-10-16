@@ -116,7 +116,7 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         b.Entity<ContributionScheme>(e =>
         {
             e.Property(x => x.Method).HasConversion<string>().HasMaxLength(20);
-            e.Property(x => x.Rounding).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Rounding).HasConversion<string>().HasMaxLength(30);
             e.Property(x => x.Code).HasMaxLength(20);
             e.Property(x => x.EmployeeRate).HasPrecision(9, 4);
             e.Property(x => x.EmployerRate).HasPrecision(9, 4);
@@ -126,6 +126,8 @@ public abstract class AppDbContext(DbContextOptions options) : DbContext(options
         {
             e.Property(x => x.Employee).HasPrecision(18, 4);
             e.Property(x => x.Employer).HasPrecision(18, 4);
+            e.Property(x => x.EmployeeFixed).HasPrecision(18, 4);
+            e.Property(x => x.EmployerFixed).HasPrecision(18, 4);
         });
         b.Entity<EmployeeContribution>(e =>
         {

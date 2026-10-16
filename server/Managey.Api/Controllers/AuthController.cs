@@ -19,6 +19,7 @@ public class AuthController(AppDbContext db, IPasswordHasher<User> hasher, Audit
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginInput input)
     {
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == input.Username.Trim());

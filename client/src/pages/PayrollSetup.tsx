@@ -147,7 +147,7 @@ function SchemeModal({ value, onClose, onDone }: { value: Partial<ContributionSc
   const importRows = () => {
     const rows = paste.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => l.replace(/[^\d.\s,\t-]/g, '').split(/[\t,; ]+/).filter(Boolean).map(Number))
     const parsed = rows.filter(r => r.length >= 3 && r.every(n => !Number.isNaN(n)))
-      .map(r => ({ upTo: r[0], employee: r[1], employer: r[2], step: r[3] ?? 0 }))
+      .map(r => ({ upTo: r[0], employee: r[1], employer: r[2], step: r[3] ?? 0, employeeFixed: 0, employerFixed: 0 }))
     if (parsed.length === 0) { setError('No rows found. Use one band per line: up to, employee, employer.'); return }
     set({ bands: parsed })
     setPaste('')
@@ -210,6 +210,7 @@ function SchemeModal({ value, onClose, onDone }: { value: Partial<ContributionSc
                   <option value="Cents">To the cent</option>
                   <option value="NearestWhole">To the nearest whole unit</option>
                   <option value="UpWhole">Up to the next whole unit</option>
+                  <option value="TotalNearestEmployeeDown">Total to nearest whole, employee share down (CPF)</option>
                 </select>
               </Field>
             )}
@@ -220,16 +221,23 @@ function SchemeModal({ value, onClose, onDone }: { value: Partial<ContributionSc
           <div className="stack" style={{ gap: 8 }}>
             <div className="spread">
               <h3>Wage bands</h3>
-              <button className="link" onClick={() => set({ bands: [...bands, { upTo: 0, employee: 0, employer: 0, step: 0 }] })}>Add band</button>
+              <button className="link" onClick={() => set({ bands: [...bands, { upTo: 0, employee: 0, employer: 0, step: 0, employeeFixed: 0, employerFixed: 0 }] })}>Add band</button>
             </div>
-            <p className="faint" style={{ fontSize: 12 }}>Each band covers wages above the previous band up to its limit. Wages above the last band use the last band.</p>
+            <p className="faint" style={{ fontSize: 12 }}>
+              Each band covers wages above the previous band up to its limit. Wages above the last band use the last band.
+              {method === 'RateBands' && ' Share = wage × rate + fixed amount, so 0.6 × (wage − 500) is rate 60 with −300.'}
+            </p>
             {bands.length > 0 && (
               <div className="band-table">
                 <table>
                   <thead>
                     <tr>
                       <th>Up to ({currencyCode()})</th><th>Employee ({unit})</th><th>Employer ({unit})</th>
-                      {method === 'RateBands' && <th title="Round wages up to a multiple of this first">Step</th>}<th></th>
+                      {method === 'RateBands' && <>
+                        <th title="Amount added to the employee share after the rate (can be negative)">+ Employee</th>
+                        <th title="Amount added to the employer share after the rate (can be negative)">+ Employer</th>
+                        <th title="Round wages up to a multiple of this first">Step</th>
+                      </>}<th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -238,7 +246,11 @@ function SchemeModal({ value, onClose, onDone }: { value: Partial<ContributionSc
                         <td><input type="number" min="0" step="0.01" value={b.upTo} onChange={e => setBand(i, { upTo: num(e.target.value) })} /></td>
                         <td><input type="number" min="0" step="0.01" value={b.employee} onChange={e => setBand(i, { employee: num(e.target.value) })} /></td>
                         <td><input type="number" min="0" step="0.01" value={b.employer} onChange={e => setBand(i, { employer: num(e.target.value) })} /></td>
-                        {method === 'RateBands' && <td><input type="number" min="0" step="0.01" value={b.step} onChange={e => setBand(i, { step: num(e.target.value) })} /></td>}
+                        {method === 'RateBands' && <>
+                          <td><input type="number" step="0.01" value={b.employeeFixed} onChange={e => setBand(i, { employeeFixed: num(e.target.value) })} /></td>
+                          <td><input type="number" step="0.01" value={b.employerFixed} onChange={e => setBand(i, { employerFixed: num(e.target.value) })} /></td>
+                          <td><input type="number" min="0" step="0.01" value={b.step} onChange={e => setBand(i, { step: num(e.target.value) })} /></td>
+                        </>}
                         <td><button className="ghost icon" aria-label="Remove band" onClick={() => set({ bands: bands.filter((_, j) => j !== i) })}>×</button></td>
                       </tr>
                     ))}

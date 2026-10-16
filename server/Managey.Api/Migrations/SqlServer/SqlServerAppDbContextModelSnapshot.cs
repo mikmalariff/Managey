@@ -150,7 +150,15 @@ namespace Managey.Api.Migrations.SqlServer
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
+                    b.Property<decimal>("EmployeeFixed")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
                     b.Property<decimal>("Employer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18,4)");
+
+                    b.Property<decimal>("EmployerFixed")
                         .HasPrecision(18, 4)
                         .HasColumnType("decimal(18,4)");
 
@@ -219,8 +227,8 @@ namespace Managey.Api.Migrations.SqlServer
 
                     b.Property<string>("Rounding")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
 
                     b.Property<int>("SortOrder")
                         .HasColumnType("int");

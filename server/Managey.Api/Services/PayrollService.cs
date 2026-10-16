@@ -163,13 +163,16 @@ public static class ContributionCalculator
         switch (s.Method)
         {
             case ContributionMethod.Percentage:
-                return (Round(capped * s.EmployeeRate / 100, s.Rounding), Round(capped * s.EmployerRate / 100, s.Rounding));
+                return Round(capped * s.EmployeeRate / 100, capped * s.EmployerRate / 100, s.Rounding);
 
             case ContributionMethod.RateBands:
             {
                 if (FindBand(s, wage) is not { } band) return (0, 0);
                 var basis = band.Step > 0 ? Math.Ceiling(capped / band.Step) * band.Step : capped;
-                return (Round(basis * band.Employee / 100, s.Rounding), Round(basis * band.Employer / 100, s.Rounding));
+                return Round(
+                    Math.Max(0, basis * band.Employee / 100 + band.EmployeeFixed),
+                    Math.Max(0, basis * band.Employer / 100 + band.EmployerFixed),
+                    s.Rounding);
             }
 
             case ContributionMethod.AmountBands:
@@ -192,6 +195,17 @@ public static class ContributionCalculator
         if (wage <= 0 || s.Bands.Count == 0) return null;
         var bands = s.Bands.OrderBy(b => b.UpTo).ToList();
         return bands.FirstOrDefault(b => wage <= b.UpTo) ?? bands[^1];
+    }
+
+    private static (decimal Employee, decimal Employer) Round(decimal employee, decimal employer, ContributionRounding rounding)
+    {
+        if (rounding == ContributionRounding.TotalNearestEmployeeDown)
+        {
+            var total = Math.Round(Math.Round(employee + employer, 2), 0, MidpointRounding.AwayFromZero);
+            var ee = Math.Floor(Math.Round(employee, 2));
+            return (ee, Math.Max(0, total - ee));
+        }
+        return (Round(employee, rounding), Round(employer, rounding));
     }
 
     private static decimal Round(decimal value, ContributionRounding rounding)

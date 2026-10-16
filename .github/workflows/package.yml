@@ -1,0 +1,43 @@
+# Builds the Windows and Linux install packages.
+# - Every push to a branch: zips are attached to the workflow run (Actions tab > run > Artifacts).
+# - Pushing a tag like v1.0.0: zips are also published as a GitHub Release.
+name: Package
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build Windows package
+        run: ./scripts/publish.sh win-x64
+      - name: Build Linux package
+        run: ./scripts/publish.sh linux-x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Managey-packages
+          path: publish/*.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: publish/*.zip

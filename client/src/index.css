@@ -244,6 +244,7 @@ input[type='file'] { padding: 5px; }
 
 .modal-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.35); display: grid; place-items: center; padding: 16px; z-index: 10; }
 .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 20px; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; }
+.modal:has(.band-table) { max-width: 820px; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 
 /* ---------- Login ---------- */

@@ -1,0 +1,20 @@
+# systemd unit for running Managey on a Linux server (e.g. a cloud VM).
+# Install:  sudo cp managey.service /etc/systemd/system/ && sudo systemctl enable --now managey
+[Unit]
+Description=Managey
+After=network.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/managey
+ExecStart=/opt/managey/Managey.Api
+User=managey
+Restart=always
+RestartSec=5
+Environment=ASPNETCORE_ENVIRONMENT=Production
+# Listen only locally; Caddy (or nginx) in front handles HTTPS.
+Environment=Urls=http://127.0.0.1:5080
+Environment=ReverseProxy=true
+
+[Install]
+WantedBy=multi-user.target

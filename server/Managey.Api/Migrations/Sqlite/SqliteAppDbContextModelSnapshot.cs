@@ -137,7 +137,15 @@ namespace Managey.Api.Migrations.Sqlite
                         .HasPrecision(18, 4)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("EmployeeFixed")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("Employer")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("EmployerFixed")
                         .HasPrecision(18, 4)
                         .HasColumnType("TEXT");
 
@@ -204,7 +212,7 @@ namespace Managey.Api.Migrations.Sqlite
 
                     b.Property<string>("Rounding")
                         .IsRequired()
-                        .HasMaxLength(20)
+                        .HasMaxLength(30)
                         .HasColumnType("TEXT");
 
                     b.Property<int>("SortOrder")

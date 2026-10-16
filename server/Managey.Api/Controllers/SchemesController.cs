@@ -12,7 +12,7 @@ namespace Managey.Api.Controllers;
 [Authorize(Roles = Roles.AdminOrHR)]
 public class SchemesController(AppDbContext db, AuditService audit) : ControllerBase
 {
-    public record BandInput(decimal UpTo, decimal Employee, decimal Employer, decimal Step);
+    public record BandInput(decimal UpTo, decimal Employee, decimal Employer, decimal Step, decimal EmployeeFixed, decimal EmployerFixed);
 
     public record SchemeInput(
         string Name, string Code, ContributionMethod Method, decimal EmployeeRate, decimal EmployerRate,
@@ -29,7 +29,7 @@ public class SchemesController(AppDbContext db, AuditService audit) : Controller
             s.Id, s.Name, s.Code, s.Method, s.EmployeeRate, s.EmployerRate, s.WageCeiling, s.Rounding, s.EffectiveFrom,
             s.DefaultForNewEmployees, s.MemberNoRequired, s.EmployerRef, s.SortOrder, s.IsActive,
             Members = members.GetValueOrDefault(s.Id),
-            Bands = s.Bands.OrderBy(b => b.UpTo).Select(b => new { b.UpTo, b.Employee, b.Employer, b.Step }),
+            Bands = s.Bands.OrderBy(b => b.UpTo).Select(b => new { b.UpTo, b.Employee, b.Employer, b.Step, b.EmployeeFixed, b.EmployerFixed }),
         }));
     }
 
@@ -130,7 +130,12 @@ public class SchemesController(AppDbContext db, AuditService audit) : Controller
         s.SortOrder = input.SortOrder;
         s.IsActive = input.IsActive;
         s.Bands = input.Method is ContributionMethod.RateBands or ContributionMethod.AmountBands
-            ? input.Bands.OrderBy(b => b.UpTo).Select(b => new ContributionBand { UpTo = b.UpTo, Employee = b.Employee, Employer = b.Employer, Step = b.Step }).ToList()
+            ? input.Bands.OrderBy(b => b.UpTo).Select(b => new ContributionBand
+            {
+                UpTo = b.UpTo, Employee = b.Employee, Employer = b.Employer, Step = b.Step,
+                EmployeeFixed = input.Method == ContributionMethod.RateBands ? b.EmployeeFixed : 0,
+                EmployerFixed = input.Method == ContributionMethod.RateBands ? b.EmployerFixed : 0,
+            }).ToList()
             : [];
     }
 }

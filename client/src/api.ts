@@ -154,7 +154,9 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   const res = await fetch(url, init)
   if (res.status === 401 && !url.endsWith('/auth/login')) onUnauthorized()
   if (!res.ok) {
-    let message = res.status === 403 ? 'You do not have access to this.' : `Request failed (${res.status}).`
+    let message = res.status === 403 ? 'You do not have access to this.'
+      : res.status === 429 ? 'Too many attempts. Wait a minute and try again.'
+      : `Request failed (${res.status}).`
     try {
       const data = await res.json()
       if (data?.message) message = data.message
@@ -182,9 +184,9 @@ export type PayLineSource = 'Manual' | 'Recurring' | 'Claim' | 'UnpaidLeave'
 export interface PayItem { kind: PayItemKind; name: string; amount: number; statutory: boolean }
 
 export type ContributionMethod = 'Percentage' | 'RateBands' | 'AmountBands' | 'Fixed' | 'PerEmployee'
-export type ContributionRounding = 'Cents' | 'NearestWhole' | 'UpWhole'
+export type ContributionRounding = 'Cents' | 'NearestWhole' | 'UpWhole' | 'TotalNearestEmployeeDown'
 
-export interface ContributionBand { upTo: number; employee: number; employer: number; step: number }
+export interface ContributionBand { upTo: number; employee: number; employer: number; step: number; employeeFixed: number; employerFixed: number }
 
 export interface ContributionScheme {
   id: number

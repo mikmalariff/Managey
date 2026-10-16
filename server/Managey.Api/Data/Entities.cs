@@ -31,7 +31,14 @@ public enum ContributionMethod
     PerEmployee,
 }
 
-public enum ContributionRounding { Cents, NearestWhole, UpWhole }
+public enum ContributionRounding
+{
+    Cents,
+    NearestWhole,
+    UpWhole,
+    /// <summary>Total rounded to the nearest whole unit, employee share rounded down, employer pays the rest (Singapore CPF).</summary>
+    TotalNearestEmployeeDown,
+}
 
 public class Department
 {
@@ -112,6 +119,9 @@ public class ContributionBand
     public decimal Employer { get; set; }
     /// <summary>RateBands only: round wages up to a multiple of this before applying the rate (0 for none).</summary>
     public decimal Step { get; set; }
+    /// <summary>RateBands only: amounts added after the rate (may be negative), for formulas like 0.6 × (wage − 500).</summary>
+    public decimal EmployeeFixed { get; set; }
+    public decimal EmployerFixed { get; set; }
 }
 
 /// <summary>An employee's membership of a scheme.</summary>
