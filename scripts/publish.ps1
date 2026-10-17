@@ -11,6 +11,9 @@ Push-Location "$root\client"
 npm ci
 npm run build
 Pop-Location
+if ($Runtime -like 'linux-*') {
+    Write-Warning 'Zips made on Windows do not keep Linux execute permissions. Run the installer with: sudo bash install.sh <domain>'
+}
 
 if (Test-Path $out) { Remove-Item $out -Recurse -Force }
 dotnet publish "$root\server\Managey.Api\Managey.Api.csproj" -c Release -r $Runtime --self-contained true -o $out

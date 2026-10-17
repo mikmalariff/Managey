@@ -107,7 +107,8 @@ Muat turun pakej baru, ekstrak, dan jalankan `install.ps1` dari folder baru tu (
 ### Tetapan lanjutan (`C:\Managey\appsettings.json`)
 Selepas ubah fail ni, restart service: `Restart-Service Managey`.
 
-- **Port:** `"Urls": "http://0.0.0.0:5080"`. Atau pasang semula dengan `-Port`.
+- **Port:** `"Urls": "http://0.0.0.0:5080"`. Atau pasang semula dengan `-Port`. Rule firewall untuk port lama akan dibuang secara automatik.
+- **Di belakang proxy lain** (load balancer di mesin lain): tetapkan `"ReverseProxy": true`, kemudian senaraikan IP proxy dalam `"TrustedProxies": ["10.0.0.5"]`.
 - **Guna SQL Server dan bukan SQLite.** Untuk syarikat besar, atau kalau dah ada SQL Server. Tetapkan ni **sebelum** penggunaan pertama:
   ```json
   "Database": {
@@ -171,23 +172,25 @@ scp Managey-linux-x64.zip ubuntu@IP-SERVER:~
 
 # di server
 ssh ubuntu@IP-SERVER
-sudo apt-get install -y unzip rsync
+sudo apt-get install -y unzip
 unzip Managey-linux-x64.zip -d managey && cd managey
-sudo ./install.sh hr.syarikatanda.com
+sudo bash install.sh hr.syarikatanda.com
 ```
-Skrip ni pasang Managey sebagai service, dan pasang **Caddy** sebagai pintu masuk. Caddy dapatkan dan perbaharui **sijil HTTPS percuma** secara automatik. Selepas 1–2 minit, buka `https://hr.syarikatanda.com`.
+Skrip ni pasang Managey sebagai service, dan pasang **Caddy** sebagai pintu masuk. Caddy dapatkan dan perbaharui **sijil HTTPS percuma** secara automatik. Kalau Caddy dah ada laman lain, laman tu tidak diusik: Managey ditambah dalam fail berasingan `/etc/caddy/managey.caddy`. Selepas 1–2 minit, buka `https://hr.syarikatanda.com`.
 
 - **Data:** `/opt/managey/data`. Untuk backup, guna snapshot cakera daripada penyedia cloud (aktifkan backup harian), atau salin folder tu.
-- **Kemas kini:** muat naik pakej baru dan jalankan `sudo ./install.sh hr.syarikatanda.com` sekali lagi.
-- **Reset kata laluan:** `sudo -u managey /opt/managey/Managey.Api --reset-password admin KataLaluanBaru123`.
+- **Kemas kini:** muat naik pakej baru dan jalankan `sudo bash install.sh hr.syarikatanda.com` sekali lagi.
+- **Reset kata laluan:** `sudo -u managey /opt/managey/Managey.Api --reset-password admin KataLaluanBaru123`. Mesti guna `-u managey`. Kalau dijalankan sebagai root, arahan akan ditolak, sebab ia boleh rosakkan kebenaran fail database.
 
 ### Windows Server di cloud
-Boleh juga: sewa VM Windows (Azure atau AWS) dan ikut **Cara A**. Tapi untuk akses melalui internet, **mesti guna HTTPS**. Pasang IIS sebagai *reverse proxy* dengan sijil, atau guna cara Kestrel HTTPS di atas dengan sijil daripada pembekal. Tetapkan juga `"ReverseProxy": true` kalau di belakang proxy. Kos VM Windows biasanya lebih tinggi kerana lesen.
+Boleh juga: sewa VM Windows (Azure atau AWS) dan ikut **Cara A**. Tapi untuk akses melalui internet, **mesti guna HTTPS**. Ada dua cara:
+- Guna cara Kestrel HTTPS di atas, dengan sijil daripada pembekal.
+- Atau pasang IIS sebagai *reverse proxy* dengan sijil. Untuk cara ni, dalam `appsettings.json` tetapkan `"ReverseProxy": true` **dan** `"Urls": "http://127.0.0.1:5080"`. Ini supaya Managey hanya terima sambungan melalui proxy, dan alamat IP pengguna yang dihantar oleh proxy boleh dipercayai. Kos VM Windows biasanya lebih tinggi kerana lesen.
 
 ### Keselamatan bila dibuka ke internet
 - **Wajib HTTPS.** Skrip Linux dah uruskan ni.
 - Tukar kata laluan admin, dan minta semua staf guna kata laluan yang kuat.
-- Sistem dah sekat cubaan login berulang: 10 kali seminit untuk setiap alamat IP.
+- Sistem sekat cubaan teka kata laluan. Selepas 10 kali gagal untuk satu akaun (atau 50 kali gagal dari satu alamat IP) dalam 15 minit, login disekat sementara. Login yang berjaya tidak dikira, jadi ramai staf yang log masuk serentak dari pejabat yang sama tak akan disekat.
 - Aktifkan backup harian/snapshot di penyedia cloud.
 - Kemas kini Managey dan sistem operasi secara berkala (`sudo apt upgrade`).
 - Data peribadi dan gaji akan disimpan di server cloud. Pastikan penyedia dan region yang dipilih selari dengan polisi PDPA syarikat.
@@ -202,6 +205,6 @@ Kalau data mesti kekal di pejabat tapi staf perlukan akses dari rumah atau semas
 | --- | --- |
 | **VPN pejabat** (paling selamat) | Staf sambung VPN syarikat dulu, kemudian buka alamat LAN seperti biasa. |
 | **Tailscale** (mudah) | Pasang Tailscale di server dan di peranti staf. Mereka akses dengan alamat Tailscale server. Percuma untuk pasukan kecil. |
-| **Cloudflare Tunnel** | Dapat alamat `https://hr.syarikatanda.com` tanpa buka port di router. Cloudflare uruskan HTTPS. Tetapkan `"ReverseProxy": true`. |
+| **Cloudflare Tunnel** | Dapat alamat `https://hr.syarikatanda.com` tanpa buka port di router. Cloudflare uruskan HTTPS. Pasang `cloudflared` di server yang sama, kemudian tetapkan `"ReverseProxy": true` dan `"Urls": "http://127.0.0.1:5080"`. |
 
 **Jangan** buka port 5080 terus di router ke internet tanpa HTTPS. Kata laluan akan dihantar tanpa encryption.

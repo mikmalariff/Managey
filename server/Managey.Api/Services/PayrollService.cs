@@ -201,6 +201,9 @@ public static class ContributionCalculator
     {
         if (rounding == ContributionRounding.TotalNearestEmployeeDown)
         {
+            // With only one paying side there is no remainder to hand over: round that side to the nearest whole.
+            if (employer == 0) return (Round(employee, ContributionRounding.NearestWhole), 0);
+            if (employee == 0) return (0, Round(employer, ContributionRounding.NearestWhole));
             var total = Math.Round(Math.Round(employee + employer, 2), 0, MidpointRounding.AwayFromZero);
             var ee = Math.Floor(Math.Round(employee, 2));
             return (ee, Math.Max(0, total - ee));

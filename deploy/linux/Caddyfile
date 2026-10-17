@@ -1,5 +1,0 @@
-# Caddy gets and renews a free HTTPS certificate for your domain automatically.
-# Point your domain's DNS (A record) at the server's public IP first, then replace the name below.
-hr.example.com {
-	reverse_proxy 127.0.0.1:5080
-}

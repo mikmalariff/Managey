@@ -7,7 +7,10 @@ runtime="${1:-win-x64}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/publish/Managey-$runtime"
 
-(cd "$root/client" && npm ci && npm run build)
+# CI builds the client once and sets MANAGEY_SKIP_CLIENT=1 for each runtime.
+if [[ "${MANAGEY_SKIP_CLIENT:-}" != "1" ]]; then
+  (cd "$root/client" && npm ci && npm run build)
+fi
 rm -rf "$out"
 dotnet publish "$root/server/Managey.Api/Managey.Api.csproj" -c Release -r "$runtime" --self-contained true -o "$out"
 

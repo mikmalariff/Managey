@@ -12,22 +12,27 @@ namespace Managey.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController(AppDbContext db, IPasswordHasher<User> hasher, AuditService audit) : ControllerBase
+public class AuthController(AppDbContext db, IPasswordHasher<User> hasher, AuditService audit, LoginThrottle throttle) : ControllerBase
 {
     public record LoginInput(string Username, string Password);
     public record ChangePasswordInput(string CurrentPassword, string NewPassword);
 
     [HttpPost("login")]
     [AllowAnonymous]
-    [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("login")]
     public async Task<IActionResult> Login(LoginInput input)
     {
+        var address = HttpContext.Connection.RemoteIpAddress?.ToString();
+        if (throttle.IsBlocked(input.Username, address))
+            return StatusCode(StatusCodes.Status429TooManyRequests, new { message = "Too many failed sign-ins. Wait 15 minutes and try again." });
+
         var user = await db.Users.FirstOrDefaultAsync(u => u.Username == input.Username.Trim());
         if (user is null || !user.IsActive ||
             hasher.VerifyHashedPassword(user, user.PasswordHash, input.Password) == PasswordVerificationResult.Failed)
         {
+            throttle.RecordFailure(input.Username, address);
             return Unauthorized(new { message = "Invalid username or password." });
         }
+        throttle.RecordSuccess(input.Username);
 
         var claims = new List<Claim>
         {

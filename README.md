@@ -31,7 +31,7 @@ Full step-by-step guides (Bahasa Melayu):
 
 In short:
 1. Get the package. The **Package** GitHub Actions workflow builds `Managey-win-x64.zip` and `Managey-linux-x64.zip` on every push, and attaches them to a Release when you push a `v*` tag. You can also build them yourself with `scripts/publish.ps1` (or `publish.sh`). The packages are self-contained: the server needs no .NET or Node.js.
-2. **Windows:** extract the zip, then run `install.ps1` in an elevated PowerShell. It installs a Windows Service, opens the firewall and prints the address to open. **Cloud Linux:** run `sudo ./install.sh your.domain.com`, which installs a systemd service and Caddy with free HTTPS.
+2. **Windows:** extract the zip, then run `install.ps1` in an elevated PowerShell. It installs a Windows Service, opens the firewall and prints the address to open. **Cloud Linux:** run `sudo bash install.sh your.domain.com`, which installs a systemd service and Caddy with free HTTPS.
 3. Sign in as `admin` / `ChangeMe123!` and change the password.
 
 Forgot the admin password? Run `Managey.Api.exe --reset-password admin NewPassword123` on the server.

@@ -47,11 +47,18 @@ if (-not $service) {
     Write-Host 'Creating the Managey service...'
     New-Service -Name Managey -DisplayName 'Managey' -BinaryPathName "`"$exe`"" `
         -StartupType Automatic -Description 'Managey HR, leave, attendance, approvals and payroll' | Out-Null
-    # Restart automatically if it ever stops unexpectedly.
-    sc.exe failure Managey reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
+} else {
+    # Point an existing service at this folder, and drop any old command-line options (such as --urls from
+    # earlier installers) so the port in appsettings.json is the one that applies.
+    sc.exe config Managey binPath= "`"$exe`"" start= auto | Out-Null
 }
+# Restart automatically if it ever stops unexpectedly.
+sc.exe failure Managey reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
 
+# One firewall rule, for the current port only.
 $ruleName = "Managey (TCP $Port)"
+Get-NetFirewallRule -DisplayName 'Managey (TCP *)' -ErrorAction SilentlyContinue |
+    Where-Object { $_.DisplayName -ne $ruleName } | Remove-NetFirewallRule
 if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue)) {
     New-NetFirewallRule -DisplayName $ruleName -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow -Profile Any | Out-Null
 }

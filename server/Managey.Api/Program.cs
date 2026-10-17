@@ -6,12 +6,25 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-var isDevelopment = string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Development", StringComparison.OrdinalIgnoreCase);
+// Running as root would leave root-owned database files the Linux service account cannot write to,
+// so refuse before anything touches the data folder.
+if (args.Contains("--reset-password") && OperatingSystem.IsLinux() && Environment.UserName == "root")
+{
+    Console.Error.WriteLine("Run this as the service user instead: sudo -u managey /opt/managey/Managey.Api --reset-password <username> <new password>");
+    return 1;
+}
+
+// Same sources the host reads for the environment: --environment, ASPNETCORE_ENVIRONMENT, DOTNET_ENVIRONMENT.
+var environmentArg = args.Select((a, i) => a.StartsWith("--environment=", StringComparison.OrdinalIgnoreCase) ? a["--environment=".Length..]
+        : a.Equals("--environment", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length ? args[i + 1] : null)
+    .FirstOrDefault(v => v is not null);
+var environmentName = environmentArg
+    ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT")
+    ?? Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT");
+var isDevelopment = string.Equals(environmentName, "Development", StringComparison.OrdinalIgnoreCase);
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = args,
@@ -63,8 +76,6 @@ builder.Services
         options.Cookie.Name = "managey.auth";
         options.Cookie.HttpOnly = true;
         options.Cookie.SameSite = SameSiteMode.Strict;
-        // Over HTTPS the cookie is marked Secure; plain HTTP on a local network still works.
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         options.ExpireTimeSpan = TimeSpan.FromHours(10);
         options.SlidingExpiration = true;
         // The SPA handles navigation; API calls should get status codes, not redirects.
@@ -73,25 +84,20 @@ builder.Services
     });
 builder.Services.AddAuthorization();
 
-// Slow down password guessing: 10 sign-in attempts per minute per address.
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
-        ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-        _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
-});
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<LoginThrottle>();
 
-// Behind a reverse proxy (IIS, nginx, Caddy, a cloud load balancer) the proxy terminates HTTPS and forwards the
-// original scheme and client address. Only trust those headers when the app is configured to sit behind one.
+// Behind a reverse proxy (IIS, nginx, Caddy, Cloudflare Tunnel, a load balancer) the proxy terminates HTTPS and
+// forwards the original scheme and client address. Those headers are only trusted from the proxy itself: the same
+// machine by default, plus any addresses listed in TrustedProxies (e.g. a load balancer's private IP).
 var behindProxy = builder.Configuration.GetValue<bool>("ReverseProxy");
 if (behindProxy)
 {
+    var trusted = builder.Configuration.GetSection("TrustedProxies").Get<string[]>() ?? [];
     builder.Services.Configure<ForwardedHeadersOptions>(o =>
     {
         o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedHost;
-        o.KnownNetworks.Clear();
-        o.KnownProxies.Clear();
+        foreach (var ip in trusted) o.KnownProxies.Add(System.Net.IPAddress.Parse(ip));
     });
 }
 
@@ -128,7 +134,6 @@ if (behindProxy) app.UseForwardedHeaders();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 
